@@ -6,8 +6,8 @@ This repository contains the plugin payloads and installer needed to develop and
 
 ## Plugins
 
-- [ChromeMCP](https://github.com/rizonetech/ChromeMCP)
-- [Bashlane](https://github.com/rizonetech/Bashlane)
+- [ChromeMCP](plugins/chromemcp-browser)
+- [Bashlane](plugins/bashlane)
 
 ## Install
 

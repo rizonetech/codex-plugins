@@ -1,0 +1,32 @@
+{
+  "name": "rizonetech-local",
+  "interface": {
+    "displayName": "Rizonetech Local"
+  },
+  "plugins": [
+    {
+      "name": "chromemcp-browser",
+      "source": {
+        "source": "local",
+        "path": "./plugins/chromemcp-browser"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Rizonetech"
+    },
+    {
+      "name": "bashlane",
+      "source": {
+        "source": "local",
+        "path": "./plugins/bashlane"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Rizonetech"
+    }
+  ]
+}

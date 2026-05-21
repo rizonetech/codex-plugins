@@ -12,14 +12,14 @@ Use ChromeMCP Browser for authenticated browser verification, local web app test
 1. Ensure the external server is running:
 
 ```bash
-cd /path/to/ChromeMCP
+cd /path/to/codex-plugins/plugins/chromemcp-browser
 ./mcp-up
 ```
 
 2. Verify the bridge before relying on it:
 
 ```bash
-cd /path/to/ChromeMCP
+cd /path/to/codex-plugins/plugins/chromemcp-browser
 bash mcp/test.sh
 ```
 
@@ -60,5 +60,5 @@ For destructive actions, click the visible action first, scope confirmation to t
 
 - The endpoint is `http://localhost:8931/mcp`.
 - The Chrome profile lives at `%LOCALAPPDATA%\ChromeMCP\Profile` on Windows.
-- If Codex has not loaded this plugin yet, restart Codex after enabling the local `chromemcp-local` marketplace.
+- If Codex has not loaded this plugin yet, run the Rizonetech marketplace installer from the `codex-plugins` repository and restart Codex after enabling `chromemcp-browser@rizonetech-local`.
 - Other MCP clients, including Claude Code and Cursor, can use the same endpoint.

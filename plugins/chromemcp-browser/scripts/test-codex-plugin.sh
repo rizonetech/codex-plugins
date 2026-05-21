@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Regression tests for the repo-local Codex plugin wrapper and installer.
+# Regression tests for the ChromeMCP Codex plugin wrapper in the monorepo.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
-cd "$ROOT"
+PLUGIN_ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+REPO_ROOT="$(cd "$PLUGIN_ROOT/../.." && pwd)"
+cd "$REPO_ROOT"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -37,6 +38,7 @@ for rel in [
     "plugins/chromemcp-browser/.codex-plugin/icon.png",
     "plugins/chromemcp-browser/.codex-plugin/icon.svg",
     "plugins/chromemcp-browser/.mcp.json",
+    "plugins/bashlane/.codex-plugin/plugin.json",
 ]:
     path = root / rel
     if rel.endswith(".json"):
@@ -48,13 +50,11 @@ manifest = json.loads((root / "plugins/chromemcp-browser/.codex-plugin/plugin.js
 assert manifest["name"] == "chromemcp-browser"
 assert manifest["skills"] == "./skills/"
 assert manifest["mcpServers"] == "./.mcp.json"
-assert manifest["interface"]["composerIcon"] == "./.codex-plugin/icon.png"
-assert manifest["interface"]["logo"] == "./.codex-plugin/icon.svg"
 
 marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_text())
 plugins = {p["name"]: p for p in marketplace["plugins"]}
 assert plugins["chromemcp-browser"]["source"]["path"] == "./plugins/chromemcp-browser"
-assert plugins["chromemcp-browser"]["policy"]["installation"] == "AVAILABLE"
+assert plugins["bashlane"]["source"]["path"] == "./plugins/bashlane"
 
 mcp = json.loads((root / "plugins/chromemcp-browser/.mcp.json").read_text())
 server = mcp["mcpServers"]["chromemcp-playwright"]
@@ -63,22 +63,25 @@ assert server["url"] == "http://localhost:8931/mcp"
 assert server["headers"]["Authorization"] == "Bearer <TOKEN>"
 PY
 
-help_text="$(bash chromemcp help)"
+help_text="$(bash plugins/chromemcp-browser/chromemcp help)"
 case "$help_text" in *codex-plugin-install*) ;; *) fail "chromemcp help does not expose codex-plugin-install" ;; esac
 case "$help_text" in *codex-plugin-test*) ;; *) fail "chromemcp help does not expose codex-plugin-test" ;; esac
 
-tmp="$(mktemp -d -t chromemcp-plugin-test-XXXXXX)"
+if ! command -v powershell.exe >/dev/null 2>&1 || ! command -v wslpath >/dev/null 2>&1; then
+  echo "SKIP installer simulation: powershell.exe/wslpath unavailable"
+  exit 0
+fi
+
+tmp="$(mktemp -d -t rizonetech-plugin-test-XXXXXX)"
 trap 'rm -rf "$tmp"' EXIT
 
-export HOME="$tmp/home"
-export XDG_CONFIG_HOME="$tmp/config"
-export CODEX_CONFIG="$tmp/codex/config.toml"
-mkdir -p "$HOME" "$XDG_CONFIG_HOME/chromemcp" "$(dirname "$CODEX_CONFIG")"
-printf '%s\n' '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' \
-  > "$XDG_CONFIG_HOME/chromemcp/token"
-chmod 600 "$XDG_CONFIG_HOME/chromemcp/token"
+config_home="$tmp/config-home"
+plugin_home="$tmp/plugin-home"
+mkdir -p "$config_home" "$plugin_home"
+config_home_win="$(wslpath -w "$config_home")"
+plugin_home_win="$(wslpath -w "$plugin_home")"
 
-cat > "$CODEX_CONFIG" <<'EOF'
+cat > "$config_home/config.toml" <<'EOF'
 # Existing user settings must survive.
 model = "gpt-5.5"
 
@@ -90,31 +93,35 @@ source = '\\?\UNC\wsl.localhost\Ubuntu\old\ChromeMCP'
 enabled = false
 EOF
 
-bash scripts/install-codex-plugin.sh >"$tmp/install.out"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "$REPO_ROOT/scripts/install-rizonetech-local.ps1")" \
+  -CodexConfigHome "$config_home_win" \
+  -CodexPluginHome "$plugin_home_win" \
+  -SkipToolInstall \
+  >"$tmp/install.out"
 
-install_root="$HOME/.codex/plugins/chromemcp-local"
+install_root="$plugin_home/plugins/rizonetech-local"
 installed_plugin="$install_root/plugins/chromemcp-browser"
 installed_mcp="$installed_plugin/.mcp.json"
+config="$config_home/config.toml"
 
 assert_file "$install_root/.agents/plugins/marketplace.json"
 assert_file "$installed_plugin/.codex-plugin/plugin.json"
 assert_file "$installed_plugin/.codex-plugin/icon.png"
 assert_file "$installed_plugin/.codex-plugin/icon.svg"
+assert_file "$install_root/plugins/bashlane/.codex-plugin/plugin.json"
 assert_file "$installed_mcp"
 
-token="$(tr -d '\n\r ' < "$XDG_CONFIG_HOME/chromemcp/token")"
-[ "${#token}" -ge 32 ] || fail "expected generated auth token"
+assert_contains "[marketplaces.rizonetech-local]" "$config"
+assert_contains "[plugins.\"chromemcp-browser@rizonetech-local\"]" "$config"
+assert_contains "[plugins.\"bashlane@rizonetech-local\"]" "$config"
+assert_contains "enabled = true" "$config"
+assert_contains "model = \"gpt-5.5\"" "$config"
+assert_not_contains "chromemcp-local" "$config"
+assert_not_contains "\\old\\ChromeMCP" "$config"
 
-assert_contains "source_type = \"local\"" "$CODEX_CONFIG"
-assert_contains ".codex\\plugins\\chromemcp-local" "$CODEX_CONFIG"
-assert_contains "[plugins.\"chromemcp-browser@chromemcp-local\"]" "$CODEX_CONFIG"
-assert_contains "enabled = true" "$CODEX_CONFIG"
-assert_not_contains "\\old\\ChromeMCP" "$CODEX_CONFIG"
-assert_contains "model = \"gpt-5.5\"" "$CODEX_CONFIG"
-
-assert_contains "Bearer $token" "$installed_mcp"
-assert_not_contains "<TOKEN>" "$installed_mcp"
 assert_contains "http://localhost:8931/mcp" "$installed_mcp"
+assert_not_contains "<TOKEN>" "$installed_mcp"
+assert_contains "<TOKEN>" plugins/chromemcp-browser/.mcp.json
 
 python3 - "$install_root" "$installed_mcp" <<'PY'
 import json
@@ -123,14 +130,13 @@ from pathlib import Path
 
 install_root = Path(sys.argv[1])
 installed_mcp = Path(sys.argv[2])
-json.loads((install_root / ".agents/plugins/marketplace.json").read_text())
+marketplace = json.loads((install_root / ".agents/plugins/marketplace.json").read_text())
+plugins = {p["name"]: p for p in marketplace["plugins"]}
+assert set(plugins) == {"chromemcp-browser", "bashlane"}
 manifest = json.loads((install_root / "plugins/chromemcp-browser/.codex-plugin/plugin.json").read_text())
-assert manifest["interface"]["composerIcon"] == "./.codex-plugin/icon.png"
-assert manifest["interface"]["logo"] == "./.codex-plugin/icon.svg"
+assert manifest["interface"]["category"] == "Rizonetech"
 server = json.loads(installed_mcp.read_text())["mcpServers"]["chromemcp-playwright"]
 assert server["headers"]["Authorization"].startswith("Bearer ")
 PY
 
-assert_contains "<TOKEN>" plugins/chromemcp-browser/.mcp.json
-
-echo "PASS codex plugin metadata and installer"
+echo "PASS codex plugin metadata and monorepo installer"

@@ -107,7 +107,7 @@ The individual scripts also still work for explicit, manual control:
 
 The MCP server listens at `http://localhost:8931/mcp`. Drop the snippet from [`mcp/client-config.json`](mcp/client-config.json) into your client's MCP config file:
 
-- **Codex** — use the local plugin in [`plugins/chromemcp-browser`](plugins/chromemcp-browser). Add this repo as a local marketplace in `~/.codex/config.toml`, enable `chromemcp-browser@chromemcp-local`, restart Codex, then start ChromeMCP with `./mcp-up`.
+- **Codex** — use the Rizonetech plugin marketplace from the `codex-plugins` repository. Run `scripts/install-rizonetech-local.ps1`, enable `chromemcp-browser@rizonetech-local`, restart Codex, then start ChromeMCP with `./mcp-up`.
 - **Claude Code** — `~/.claude.json` (or a project-local `.mcp.json`)
 - **Cursor** — `~/.cursor/mcp.json`
 - **Continue** — your `config.json`'s `mcpServers` block
@@ -143,35 +143,38 @@ See [`SECURITY.md`](SECURITY.md) for the full threat model, including what the a
 
 This repository includes a Codex plugin wrapper so ChromeMCP can be used as a callable browser-tool replacement when the bundled Chrome connector is unavailable.
 
-The easiest install path from WSL is:
+The easiest install path is from PowerShell at the `codex-plugins` repository root:
 
-```bash
-bash scripts/install-codex-plugin.sh
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-rizonetech-local.ps1
 ```
 
-The installer generates or reuses the ChromeMCP bearer token, creates a tokenized user-local marketplace copy under `~/.codex/plugins/chromemcp-local/`, and points Codex at that generated marketplace. Then restart Codex.
+The installer generates or reuses the ChromeMCP bearer token, creates a tokenized user-local marketplace copy under `~/.codex/plugins/rizonetech-local/`, and points Codex at that generated marketplace. Then restart Codex.
 
 Add this marketplace and plugin entry to `~/.codex/config.toml`:
 
 ```toml
-[marketplaces.chromemcp-local]
+[marketplaces.rizonetech-local]
 source_type = "local"
-source = '<generated Windows UNC path to ~/.codex/plugins/chromemcp-local>'
+source = '<generated Windows UNC path to ~/.codex/plugins/rizonetech-local>'
 
-[plugins."chromemcp-browser@chromemcp-local"]
+[plugins."chromemcp-browser@rizonetech-local"]
+enabled = true
+
+[plugins."bashlane@rizonetech-local"]
 enabled = true
 ```
 
 Then restart Codex and run:
 
 ```bash
-cd /path/to/ChromeMCP
+cd /path/to/codex-plugins/plugins/chromemcp-browser
 ./mcp-up
 bash mcp/test.sh
 bash scripts/test-codex-plugin.sh
 ```
 
-The plugin exposes the MCP server as `chromemcp-playwright`. The tracked `plugins/chromemcp-browser/.mcp.json` intentionally keeps `Authorization: Bearer <TOKEN>` so secrets stay out of git; the installer writes the real token only into the generated local marketplace copy. Re-run `bash scripts/install-codex-plugin.sh` after `./mcp-token --rotate`.
+The plugin exposes the MCP server as `chromemcp-playwright`. The tracked `plugins/chromemcp-browser/.mcp.json` intentionally keeps `Authorization: Bearer <TOKEN>` so secrets stay out of git; the installer writes the real token only into the generated local marketplace copy. Re-run `scripts/install-rizonetech-local.ps1` after `./mcp-token --rotate`.
 
 See [`docs/CODEX_PLUGIN.md`](docs/CODEX_PLUGIN.md) for redistribution notes and manual install details.
 
