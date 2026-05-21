@@ -704,6 +704,11 @@ const proxyServer = http.createServer((req, res) => {
     if (req.method === 'HEAD') return res.end();
     return res.end(JSON.stringify({
       status: 'ok',
+      visibleInteractions: {
+        enabled: VISIBLE_INTERACTIONS,
+        focusScript: FOCUS_CHROME_SCRIPT,
+        focusIntervalMs: VISIBLE_FOCUS_INTERVAL_MS,
+      },
       cdp: {
         endpoint: CDP_ENDPOINT,
         healthy: cdpHealthy,
@@ -864,5 +869,6 @@ proxyServer.on('error', (e) => fail(`failed to bind ${PUBLIC_HOST}:${PUBLIC_PORT
     } else {
       log.info(`listening on ${PUBLIC_HOST}:${PUBLIC_PORT}, forwarding to ${UPSTREAM_HOST}:${UPSTREAM_PORT} (auth required)`);
     }
+    log.info(`visible interactions ${VISIBLE_INTERACTIONS ? 'enabled' : 'disabled'}${VISIBLE_INTERACTIONS ? `; focusing Chrome via ${FOCUS_CHROME_SCRIPT}` : ' (MCP_VISIBLE_INTERACTIONS=0)'}`);
   });
 })();
