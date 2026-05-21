@@ -34,6 +34,6 @@
     ],
     "brandColor": "#0F766E",
     "composerIcon": "./.codex-plugin/icon.svg",
-    "logo": "./.codex-plugin/icon.svg"
+    "logo": "./.codex-plugin/icon.png"
   }
 }

@@ -48,6 +48,40 @@ BASE_GATES = (
     "rollback_plan",
     "todo_history_updated",
 )
+MODULE_DEFINITIONS = {
+    "laravel": {
+        "label": "Laravel",
+        "markers": ("artisan", "composer.json", "app/Providers"),
+        "deploy_queue_markers": ("bin/cloud",),
+        "deploy_rules": (
+            "Check Laravel Cloud or project deployment queue before commit/push/deploy when the project exposes a cloud CLI.",
+            "Do not start another deploy while a deployment is pending or running.",
+            "After deploy, verify the deployed URL and record the current deployment pointer.",
+        ),
+        "suggested_checks": ("php artisan test", "npm run build"),
+    },
+    "wordpress": {
+        "label": "WordPress",
+        "markers": ("wp-content", "public/wp-content", "wp-config.php"),
+        "deploy_queue_markers": (),
+        "deploy_rules": (
+            "Treat plugin/theme cutovers, release packages, and publish operations as deploy work.",
+            "Record the active plugin/theme path, version, backup, restore command, and WP-CLI verification command before cutover.",
+            "Do not replace an active plugin/theme directory without explicit current-thread approval.",
+        ),
+        "suggested_checks": ("php -l", "wp plugin list"),
+    },
+    "node": {
+        "label": "Node",
+        "markers": ("package.json",),
+        "deploy_queue_markers": (),
+        "deploy_rules": (
+            "Run the project build/test commands before release or production handoff.",
+            "Record package manager, build command, and release target when deploy work is requested.",
+        ),
+        "suggested_checks": ("npm test", "npm run build"),
+    },
+}
 CLASSIFICATION_PATTERNS = {
     "ui_browser_work": (
         r"\badmin\b",
@@ -269,6 +303,161 @@ def git_snapshot(root: Path) -> dict[str, Any]:
     }
 
 
+def has_marker(root: Path, marker: str) -> bool:
+    return (root / marker).exists()
+
+
+def detect_modules(root: Path) -> list[dict[str, Any]]:
+    modules = []
+    for name, definition in MODULE_DEFINITIONS.items():
+        matched = [marker for marker in definition["markers"] if has_marker(root, marker)]
+        if not matched:
+            continue
+        deploy_queue_markers = [
+            marker for marker in definition.get("deploy_queue_markers", ()) if has_marker(root, marker)
+        ]
+        modules.append(
+            {
+                "name": name,
+                "label": definition["label"],
+                "matched_markers": matched,
+                "deploy_queue_markers": deploy_queue_markers,
+                "deploy_rules": list(definition["deploy_rules"]),
+                "suggested_checks": list(definition["suggested_checks"]),
+            }
+        )
+    if not modules:
+        modules.append(
+            {
+                "name": "generic",
+                "label": "Generic",
+                "matched_markers": [],
+                "deploy_queue_markers": [],
+                "deploy_rules": [
+                    "Apply generic deploy safety: explicit authorization, focused tests/builds, rollback notes, and post-deploy verification.",
+                    "Do not assume Laravel, WordPress, Node, or another stack-specific deploy command unless the repository provides it.",
+                ],
+                "suggested_checks": [],
+            }
+        )
+    return modules
+
+
+def module_names(preflight: dict[str, Any]) -> set[str]:
+    return {module.get("name") for module in preflight.get("modules") or []}
+
+
+def detect_laravel_cloud_queue(root: Path) -> dict[str, Any]:
+    cloud = root / "bin/cloud"
+    if not cloud.exists():
+        return {
+            "status": "not-applicable",
+            "reason": "No bin/cloud CLI found.",
+        }
+    environment_list = run_command(
+        [str(cloud), "environment:list", "--json", "--fields=id,name,status,currentDeploymentId"],
+        cwd=root,
+        timeout=30,
+    )
+    if environment_list["status"] != "passed" or not environment_list.get("stdout"):
+        return {
+            "status": "unknown",
+            "command": environment_list["command"],
+            "stderr": environment_list.get("stderr"),
+            "reason": "Unable to inspect Laravel Cloud environments.",
+        }
+    try:
+        environments = json.loads(environment_list["stdout"])
+    except json.JSONDecodeError:
+        return {
+            "status": "unknown",
+            "command": environment_list["command"],
+            "reason": "Laravel Cloud environment output was not JSON.",
+        }
+    if not isinstance(environments, list) or not environments:
+        return {
+            "status": "unknown",
+            "command": environment_list["command"],
+            "reason": "Laravel Cloud returned no environments.",
+        }
+    environment = next((item for item in environments if item.get("status") == "running"), environments[0])
+    environment_id = environment.get("id")
+    if not environment_id:
+        return {
+            "status": "unknown",
+            "environment": environment,
+            "reason": "Laravel Cloud environment id was unavailable.",
+        }
+    deployments = run_command(
+        [
+            str(cloud),
+            "deployment:list",
+            str(environment_id),
+            "--json",
+            "--fields=id,status,commitHash,commitMessage,startedAt,finishedAt,failureReason",
+        ],
+        cwd=root,
+        timeout=30,
+    )
+    if deployments["status"] != "passed" or not deployments.get("stdout"):
+        return {
+            "status": "unknown",
+            "environment": environment,
+            "command": deployments["command"],
+            "stderr": deployments.get("stderr"),
+            "reason": "Unable to inspect Laravel Cloud deployments.",
+        }
+    try:
+        deployment_items = json.loads(deployments["stdout"])
+    except json.JSONDecodeError:
+        return {
+            "status": "unknown",
+            "environment": environment,
+            "command": deployments["command"],
+            "reason": "Laravel Cloud deployment output was not JSON.",
+        }
+    blocking_statuses = {
+        "build.pending",
+        "build.running",
+        "deployment.pending",
+        "deployment.running",
+        "pending",
+        "running",
+    }
+    active = None
+    if isinstance(deployment_items, list):
+        active = next(
+            (
+                item
+                for item in deployment_items
+                if str(item.get("status") or "").lower() in blocking_statuses
+            ),
+            None,
+        )
+    return {
+        "status": "blocked" if active else "passed",
+        "environment": environment,
+        "active_deployment": active,
+        "reason": "Pending/running Laravel Cloud deployment found." if active else "No pending/running Laravel Cloud deployment found.",
+    }
+
+
+def module_preflight_checks(root: Path, modules: list[dict[str, Any]], classifications: list[str]) -> dict[str, Any]:
+    checks: dict[str, Any] = {}
+    if "deploy" not in classifications:
+        return checks
+    names = {module["name"] for module in modules}
+    if "laravel" in names:
+        checks["laravel_cloud_queue"] = detect_laravel_cloud_queue(root)
+    if "wordpress" in names:
+        checks["wordpress_cutover_manifest"] = {
+            "status": "required-before-cutover",
+            "fields": ["current", "backup", "restore_command", "check"],
+            "reason": "WordPress deploy/cutover work needs a rollback manifest before active plugin/theme replacement.",
+        }
+    return checks
+
+
 def find_chromemcp_roots(root: Path) -> list[str]:
     candidates = [
         Path.home() / ".codex/plugins/rizonetech-local/plugins/chromemcp-browser",
@@ -322,11 +511,16 @@ def recovery_hint(root: Path) -> str:
 def required_gates(preflight: dict[str, Any]) -> set[str]:
     classifications = set(preflight.get("classifications") or [])
     dangerous = set(preflight.get("dangerous_operations") or [])
+    modules = module_names(preflight)
     required = {"implemented_review", "implemented", "automated_tests", "feature_gate", "todo_history_updated"}
     if "ui_browser_work" in classifications:
         required.update({"chromemcp_local", "visual_qa", "workflow_matrix", "browser_handoff"})
     if "deploy" in classifications:
         required.update({"production_deploy", "rollback_plan"})
+    if "wordpress" in modules and dangerous:
+        required.update({"destructive_approval", "rollback_plan"})
+    if "laravel" in modules and "deploy" in classifications:
+        required.add("production_deploy")
     if preflight.get("checkpoint_required"):
         required.add("destructive_approval")
     if dangerous:
@@ -353,16 +547,27 @@ def build_preflight(root: Path, todo_file: str | None) -> dict[str, Any]:
         raise SystemExit(f"Todo file not found: {todo_file}")
     text = todo_path.read_text(encoding="utf-8") if todo_path and todo_path.exists() else ""
     classification = classify_text(text)
+    modules = detect_modules(root)
+    module_checks = module_preflight_checks(root, modules, classification["classifications"])
     chrome = chromemcp_health(root)
+    module_blockers = [
+        {"check": name, **check}
+        for name, check in module_checks.items()
+        if check.get("status") == "blocked"
+    ]
     return {
         **classification,
-        "status": "passed" if chrome["status"] == "passed" else "blocked",
+        "status": "passed" if chrome["status"] == "passed" and not module_blockers else "blocked",
         "captured_at": now(),
         "todo_file": todo_file,
         "todo_file_exists": bool(todo_path and todo_path.exists()),
         "git": git_snapshot(root),
+        "modules": modules,
+        "module_checks": module_checks,
+        "module_blockers": module_blockers,
         "chromemcp": chrome,
         "notes": [
+            "Project modules are detected from repository markers. Apply only the module rules that match this repository.",
             "ChromeMCP is preferred for user-facing verification.",
             "If ChromeMCP is blocked, browser/UI completion gates must remain blocked until real evidence is captured.",
         ],
@@ -380,6 +585,8 @@ def command_start(args: argparse.Namespace) -> None:
         "current_slice": None,
         "status": "started" if preflight["status"] == "passed" else "preflight_blocked",
         "preflight": preflight,
+        "modules": preflight["modules"],
+        "module_checks": preflight["module_checks"],
         "gates": blank_gates(preflight),
         "slices": {},
         "notes": [],
@@ -416,7 +623,10 @@ def command_start(args: argparse.Namespace) -> None:
     write_state(root, state)
     print(f"Started Overnight Runner: {args.todo_file}")
     print("Preflight classifications: " + ", ".join(preflight["classifications"]))
+    print("Modules: " + ", ".join(module["name"] for module in preflight["modules"]))
     print(f"ChromeMCP: {preflight['chromemcp']['status']}")
+    if preflight.get("module_blockers"):
+        print("Module blockers: " + ", ".join(blocker["check"] for blocker in preflight["module_blockers"]))
     if preflight["chromemcp"]["status"] != "passed":
         print("ChromeMCP blocker recorded; non-browser work may continue when safe.")
         print("Recovery: " + preflight["chromemcp"].get("recovery", "not available"))
@@ -753,9 +963,11 @@ def build_handoff(state: dict[str, Any]) -> str:
     blocked = [f"{name}={gate.get('status')}" for name, gate in gates.items() if gate.get("status") == "blocked"]
     chromemcp = state.get("chromemcp") or {}
     commit = state.get("commit_push") or {}
+    modules = state.get("modules") or (state.get("preflight") or {}).get("modules") or []
     lines = [
         "## Run Handoff",
         "",
+        "- Modules: " + (", ".join(module.get("name", "unknown") for module in modules) if modules else "not recorded"),
         "- Completed: " + ("; ".join(completed) if completed else "No completed slices recorded."),
         "- Verified Gates: " + ("; ".join(passed) if passed else "No passed gates recorded."),
         "- Blocked Gates: " + ("; ".join(blocked) if blocked else "None recorded."),

@@ -41,6 +41,26 @@ can be honestly completed without browser evidence. User-facing UI, navigation,
 visual, CRUD, GRUD, and production smoke items remain incomplete until real
 ChromeMCP verification passes or the todo records a concrete blocker.
 
+## Modules
+
+Overnight Runner is project-agnostic. The helper detects repository modules from
+markers and records them in preflight state:
+
+- `laravel`: `artisan`, `composer.json`, and `app/Providers`
+- `wordpress`: `wp-content`, `public/wp-content`, or `wp-config.php`
+- `node`: `package.json`
+- `generic`: no known module markers
+
+Apply only the rules for detected modules. A Laravel project can use Laravel
+Cloud queue/deploy checks. A WordPress project can require plugin/theme cutover
+rollback evidence. A generic repository still keeps the deploy, rollback, test,
+and todo-history gates, but must not assume Laravel, WordPress, Node, or any
+other stack-specific command.
+
+If more than one module is detected, apply the relevant rules for each touched
+slice. For example, a Laravel app with a Node build should satisfy Laravel
+deploy safety and the Node build/test checks when both apply.
+
 ## Autonomy
 
 Work through all unblocked todo slices. Stop only for:
@@ -132,6 +152,28 @@ Before any deployment or release:
 - record current deployment/release pointer and rollback instructions
 - avoid starting another deploy when a previous deploy is still pending/running
 - update `production_deploy`, `rollback_plan`, and `todo_history_updated` gates
+
+Laravel module:
+
+- If `bin/cloud` exists, inspect Laravel Cloud before deploy/push handoff.
+- If a deployment is pending/running, block code/UI/infra deploy work and record
+  the active deployment evidence.
+- After deployment, verify the deployed URL and record the deployment pointer.
+
+WordPress module:
+
+- Treat active plugin/theme replacement, release package publication, and
+  updater publication as deploy/cutover work.
+- Before cutover, record active path/version, backup path, restore command, and
+  WP-CLI verification command in the rollback manifest.
+- Do not replace or delete active plugin/theme directories without explicit
+  current-thread approval.
+
+Generic module:
+
+- Keep deploy gates active when the todo requests deploy/release/production work.
+- Record the project-specific deploy command and rollback plan discovered from
+  the repo or user instructions; do not invent framework-specific commands.
 
 ## Finish Rule
 

@@ -68,4 +68,54 @@ python3 "$RUNNER" handoff --write-todo >/tmp/overnight-handoff.out
 grep -q "## Run Handoff" todo/ui.md
 python3 "$RUNNER" clear "test completed" >/tmp/overnight-clear.out
 
+laravel_tmp="$tmp/laravel"
+mkdir -p "$laravel_tmp/app/Providers" "$laravel_tmp/todo"
+cd "$laravel_tmp"
+git init -q
+git config user.email test@example.invalid
+git config user.name "Overnight Runner Test"
+touch artisan composer.json
+cat > todo/deploy.md <<'EOF'
+# Todo
+
+- [ ] Deploy Laravel settings page to production
+- Blocked: deployment requires explicit target approval
+EOF
+python3 "$RUNNER" preflight todo/deploy.md > "$tmp/laravel-preflight.json"
+python3 - "$tmp/laravel-preflight.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+data = json.loads(Path(sys.argv[1]).read_text())
+modules = {item["name"] for item in data["modules"]}
+assert "laravel" in modules, modules
+assert "deploy" in data["classifications"], data["classifications"]
+assert data["module_checks"].get("laravel_cloud_queue", {}).get("status") == "not-applicable"
+PY
+
+wordpress_tmp="$tmp/wordpress"
+mkdir -p "$wordpress_tmp/public/wp-content/plugins/example" "$wordpress_tmp/todo"
+cd "$wordpress_tmp"
+git init -q
+git config user.email test@example.invalid
+git config user.name "Overnight Runner Test"
+cat > todo/cutover.md <<'EOF'
+# Todo
+
+- [ ] Replace active plugin during production cutover
+- Blocked: waiting for approval
+EOF
+python3 "$RUNNER" preflight todo/cutover.md > "$tmp/wordpress-preflight.json"
+python3 - "$tmp/wordpress-preflight.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+data = json.loads(Path(sys.argv[1]).read_text())
+modules = {item["name"] for item in data["modules"]}
+assert "wordpress" in modules, modules
+assert "destructive_cutover" in data["classifications"], data["classifications"]
+assert "active_plugin_replacement" in data["dangerous_operations"], data["dangerous_operations"]
+assert data["module_checks"].get("wordpress_cutover_manifest", {}).get("status") == "required-before-cutover"
+PY
+
 echo "PASS overnight runner guard"
