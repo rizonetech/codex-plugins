@@ -1,21 +1,41 @@
 # Rizonetech Codex Plugins
 
-Shared Codex plugin catalog for Rizonetech plugins.
+Local Codex marketplace installer for Rizonetech plugins.
 
-This repository does not combine plugin source code. It lists independent plugin repositories so they can appear together in the Codex plugins interface.
+This repository does not combine plugin source code. It installs independent plugin repositories into one local Codex marketplace so they appear together in the Codex plugins interface.
 
 ## Plugins
 
 - [ChromeMCP](https://github.com/rizonetech/ChromeMCP)
 - [Bashlane](https://github.com/rizonetech/Bashlane)
 
-## Catalog
+## Install
 
-The Codex catalog lives in `.agents/plugins/marketplace.json`. A root-level `marketplace.json` copy is kept for quick viewing.
+From PowerShell:
 
-For local Codex registration, the catalog points at sibling workspace clones:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-rizonetech-local.ps1
+```
 
-- `../ChromeMCP/plugins/chromemcp-browser`
-- `../Bashlane`
+If sibling `ChromeMCP` or `Bashlane` repositories are missing, the installer clones them from GitHub before creating the local marketplace.
+
+The installer creates:
+
+```text
+~/.codex/plugins/rizonetech-local/
+  .agents/plugins/marketplace.json
+  plugins/chromemcp-browser/
+  plugins/bashlane/
+```
+
+It also updates `~/.codex/config.toml` to enable:
+
+```toml
+[plugins."chromemcp-browser@rizonetech-local"]
+enabled = true
+
+[plugins."bashlane@rizonetech-local"]
+enabled = true
+```
 
 Both plugins are grouped under the `Rizonetech` category.
