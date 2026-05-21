@@ -72,6 +72,53 @@ function Remove-TomlBlock {
   return [regex]::Replace($Text, "(?ms)^\[$escapedHeader\]\r?\n.*?(?=^\[|\z)", "")
 }
 
+function Copy-DirectoryClean {
+  param(
+    [Parameter(Mandatory = $true)][string]$Source,
+    [Parameter(Mandatory = $true)][string]$Destination
+  )
+
+  $skipNames = @(
+    ".git",
+    "node_modules",
+    "logs",
+    ".playwright-mcp",
+    "demo-output",
+    "__pycache__",
+    "artifacts"
+  )
+
+  New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+  $sourceRoot = [System.IO.Path]::GetFullPath($Source).TrimEnd("\", "/")
+
+  Get-ChildItem -LiteralPath $Source -Recurse -Force | ForEach-Object {
+    $fullName = [System.IO.Path]::GetFullPath($_.FullName)
+    if (-not $fullName.StartsWith($sourceRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+      throw "Refusing to copy path outside source root: $fullName"
+    }
+    $relative = $fullName.Substring($sourceRoot.Length).TrimStart("\", "/")
+    $parts = $relative -split '[\\/]'
+
+    foreach ($part in $parts) {
+      if ($skipNames -contains $part) {
+        return
+      }
+    }
+
+    if (-not $_.PSIsContainer -and $_.Name -like "*.pyc") {
+      return
+    }
+
+    $target = Join-Path $Destination $relative
+    if ($_.PSIsContainer) {
+      New-Item -ItemType Directory -Force -Path $target | Out-Null
+    } else {
+      New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
+      Copy-Item -Force -LiteralPath $_.FullName -Destination $target
+    }
+  }
+}
+
 if ([string]::IsNullOrWhiteSpace($CodexConfigHome)) {
   $CodexConfigHome = Join-Path $HOME ".codex"
 }
@@ -131,7 +178,7 @@ New-Item -ItemType Directory -Force -Path $pluginsDestRoot | Out-Null
 foreach ($plugin in $plugins) {
   $dest = Join-Path $pluginsDestRoot $plugin.Name
   Remove-DirectoryInside -Target $dest -Root $pluginsDestRoot
-  Copy-Item -Recurse -Force -LiteralPath $plugin.Source -Destination $dest
+  Copy-DirectoryClean -Source $plugin.Source -Destination $dest
 
   $manifestPath = Join-Path $dest ".codex-plugin\plugin.json"
   $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
