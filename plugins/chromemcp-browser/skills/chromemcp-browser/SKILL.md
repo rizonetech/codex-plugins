@@ -30,6 +30,7 @@ If `mcp/test.sh` fails, fix ChromeMCP before claiming browser verification passe
 ## Reliable Browser Testing
 
 - Treat ChromeMCP as a real shared browser. Reuse existing authenticated sessions, but never print credentials, cookies, tokens, or localStorage values.
+- Expect ChromeMCP to be visible: browser tool calls should bring the shared ChromeMCP window forward so the user can monitor actions. If Chrome does not surface, verify `MCP_VISIBLE_INTERACTIONS` is not set to `0`.
 - Prefer user-visible actions: navigate, click the actual control, wait for the page state that proves success, and take screenshots only when visual proof is useful.
 - For user-facing app handoff, verify visual accuracy, appearance, and navigation explicitly, not only DOM state.
 - Use stable locators based on role, label, placeholder, visible text, or form semantics. Avoid brittle generated CSS classes.

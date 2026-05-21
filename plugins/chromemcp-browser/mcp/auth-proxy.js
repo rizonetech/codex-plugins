@@ -30,7 +30,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const log = require('./log');
 const { Registry } = require('./metrics');
 
@@ -84,10 +84,80 @@ const TOKEN_PATH    = process.env.MCP_TOKEN_PATH
   || path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'chromemcp', 'token');
 const PLAYWRIGHT_CLI = process.env.MCP_PLAYWRIGHT_CLI
   || path.join(__dirname, 'node_modules', '@playwright', 'mcp', 'cli.js');
+const VISIBLE_INTERACTIONS = process.env.MCP_VISIBLE_INTERACTIONS !== '0';
+const VISIBLE_FOCUS_INTERVAL_MS = parseInt(process.env.MCP_VISIBLE_FOCUS_INTERVAL_MS || '750', 10);
+const PROJECT_ROOT = path.dirname(__dirname);
+const FOCUS_CHROME_SCRIPT = process.env.MCP_FOCUS_CHROME_SCRIPT
+  || path.join(PROJECT_ROOT, 'launcher', 'Focus-Chrome.ps1');
 
 function fail(msg, code = 1) {
   log.error(msg);
   process.exit(code);
+}
+
+// --- Visible interaction support ----------------------------------------
+// Playwright MCP already attaches to the visible Windows Chrome profile via
+// CDP. This helper nudges that Chrome window to the foreground before browser
+// tool calls so users can monitor actions from Codex, Claude, Cursor, etc.
+let lastVisibleFocusAt = 0;
+let visibleFocusInflight = false;
+let focusScriptWindowsPath = null;
+let focusScriptPathResolved = false;
+
+function findWindowsExe(name) {
+  if (name === 'powershell.exe') {
+    for (const candidate of [
+      '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe',
+      '/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/powershell.exe',
+    ]) {
+      try {
+        if (fs.existsSync(candidate)) return candidate;
+      } catch {}
+    }
+  }
+  return name;
+}
+
+function resolveWindowsPath(linuxPath) {
+  const result = spawnSync('wslpath', ['-w', linuxPath], { encoding: 'utf8' });
+  if (result.status !== 0) return null;
+  return result.stdout.trim();
+}
+
+function isBrowserToolCall(requestContext) {
+  return requestContext.toolName && requestContext.toolName.startsWith('browser_');
+}
+
+function focusChromeForVisibleInteraction(requestContext) {
+  if (!VISIBLE_INTERACTIONS || !isBrowserToolCall(requestContext)) return;
+  if (!fs.existsSync(FOCUS_CHROME_SCRIPT)) return;
+
+  const now = Date.now();
+  if (visibleFocusInflight || now - lastVisibleFocusAt < VISIBLE_FOCUS_INTERVAL_MS) return;
+
+  if (!focusScriptPathResolved) {
+    focusScriptWindowsPath = resolveWindowsPath(FOCUS_CHROME_SCRIPT);
+    focusScriptPathResolved = true;
+  }
+  if (!focusScriptWindowsPath) return;
+
+  visibleFocusInflight = true;
+  lastVisibleFocusAt = now;
+
+  const child = spawn(findWindowsExe('powershell.exe'), [
+    '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    focusScriptWindowsPath,
+  ], {
+    stdio: 'ignore',
+    detached: true,
+  });
+
+  child.on('exit', () => { visibleFocusInflight = false; });
+  child.on('error', () => { visibleFocusInflight = false; });
+  child.unref();
 }
 
 // --- Token resolution ----------------------------------------------------
@@ -737,6 +807,7 @@ function forwardBufferedRequest(req, body, res, onFinish) {
   const headers = buildForwardHeaders(req.headers);
   headers['content-length'] = String(body.length);
   const requestContext = extractRequestContext(body);
+  focusChromeForVisibleInteraction(requestContext);
   const upstreamReq = http.request({
     host: UPSTREAM_HOST, port: UPSTREAM_PORT,
     method: req.method, path: req.url,

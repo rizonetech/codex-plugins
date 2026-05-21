@@ -91,7 +91,8 @@ if (-not (Test-Path $ProfileDir)) {
 
 $chromeArgs = @(
     "--remote-debugging-port=$Port",
-    "--user-data-dir=$ProfileDir"
+    "--user-data-dir=$ProfileDir",
+    "--start-maximized"
 )
 
 Write-Host "Starting Chrome..."

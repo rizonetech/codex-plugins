@@ -10,6 +10,8 @@ Most "browser for agents" setups spin up a throwaway headless Chromium with an e
 
 It's also **multi-client by design**. Run Claude Code and Cursor at the same time, both pointing at the same MCP endpoint, both driving the same Chrome window.
 
+ChromeMCP is also **watchable by default**. Browser tool calls focus the visible ChromeMCP Chrome window before they run, so you can monitor what an agent is doing in real time. Set `MCP_VISIBLE_INTERACTIONS=0` before starting the server only if you want ChromeMCP to stay in the background.
+
 ## Architecture
 
 ```
@@ -87,11 +89,14 @@ That single `./mcp-up` is enough. It pre-flights the upstream CDP endpoint and, 
 
 The first time, sign in to whichever sites you want the agent to access in the new Chrome window. The profile lives in `%LOCALAPPDATA%\ChromeMCP\Profile` and persists across restarts, so you only sign in once.
 
+By default, ChromeMCP starts Chrome maximized and brings it to the foreground before browser tool calls. This keeps Codex, Claude Code, Cursor, and other MCP clients visibly inspectable while they work.
+
 To opt out of either auto-step (e.g. for CI or restricted environments):
 
 ```bash
 MCP_NO_AUTO_CHROME=1 ./mcp-up    # don't auto-launch Chrome
 MCP_NO_AUTO_BRIDGE=1 ./mcp-up    # don't auto-install the bridge (skip UAC)
+MCP_VISIBLE_INTERACTIONS=0 ./mcp-up # don't focus Chrome before tool calls
 ```
 
 The individual scripts also still work for explicit, manual control:

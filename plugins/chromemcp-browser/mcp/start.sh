@@ -24,6 +24,10 @@
 #   MCP_CHROME_MIN_MAJOR (default 140)     - floor of the warn-free Chrome
 #                                            version range
 #   MCP_CHROME_MAX_MAJOR (default 150)     - ceiling of the warn-free range
+#   MCP_VISIBLE_INTERACTIONS (default 1)   - focus the visible ChromeMCP
+#                                            window before browser tool calls
+#                                            so users can watch interactions.
+#                                            Set to 0 to disable.
 set -euo pipefail
 
 cd "$(dirname "$(readlink -f "$0")")"
