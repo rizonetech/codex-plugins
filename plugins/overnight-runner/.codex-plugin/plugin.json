@@ -1,0 +1,39 @@
+{
+  "name": "overnight-runner",
+  "version": "0.1.0",
+  "description": "Run long autonomous todo files with guarded slice gates and visible ChromeMCP verification.",
+  "author": {
+    "name": "Rizonetech (Pty) Ltd",
+    "email": "derick@rizonetech.com",
+    "url": "https://rizonetech.com"
+  },
+  "license": "MIT",
+  "keywords": [
+    "overnight",
+    "todo",
+    "automation",
+    "chromemcp",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Overnight Runner",
+    "shortDescription": "Guard long todo runs with state, gates, handoffs, and ChromeMCP checks.",
+    "longDescription": "Overnight Runner consolidates the Rizonetech overnight todo workflows into one reusable Codex plugin. It tracks preflight, implementation, test, browser, visual, deploy, commit, blocker, and handoff evidence while failing gracefully when ChromeMCP is unavailable.",
+    "developerName": "Rizonetech",
+    "category": "Rizonetech",
+    "capabilities": [
+      "Workflow",
+      "Browser",
+      "Verification"
+    ],
+    "defaultPrompt": [
+      "Use Overnight Runner for this todo file",
+      "Start an overnight todo run",
+      "Run the Overnight Runner finish check"
+    ],
+    "brandColor": "#0F766E",
+    "composerIcon": "./.codex-plugin/icon.svg",
+    "logo": "./.codex-plugin/icon.svg"
+  }
+}

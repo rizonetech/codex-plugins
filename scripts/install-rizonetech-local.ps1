@@ -152,6 +152,11 @@ $plugins = @(
     Name = "bashlane"
     Source = Join-Path $SourcePluginsRoot "bashlane"
     Requires = @(".codex-plugin\plugin.json", "scripts\install.ps1", "scripts\wsl-run.ps1")
+  },
+  @{
+    Name = "overnight-runner"
+    Source = Join-Path $SourcePluginsRoot "overnight-runner"
+    Requires = @(".codex-plugin\plugin.json", "scripts\overnight-runner.py", "skills\overnight-runner\SKILL.md")
   }
 )
 
@@ -244,6 +249,18 @@ $marketplace = @{
         authentication = "ON_INSTALL"
       }
       category = "Rizonetech"
+    },
+    @{
+      name = "overnight-runner"
+      source = @{
+        source = "local"
+        path = "./plugins/overnight-runner"
+      }
+      policy = @{
+        installation = "AVAILABLE"
+        authentication = "ON_INSTALL"
+      }
+      category = "Rizonetech"
     }
   )
 }
@@ -278,7 +295,8 @@ foreach ($header in @(
   'marketplaces.rizonetech-codex-plugins',
   'marketplaces.rizonetech-local',
   'plugins."chromemcp-browser@rizonetech-local"',
-  'plugins."bashlane@rizonetech-local"'
+  'plugins."bashlane@rizonetech-local"',
+  'plugins."overnight-runner@rizonetech-local"'
 )) {
   $config = Remove-TomlBlock -Text $config -Header $header
 }
@@ -295,6 +313,9 @@ source = '$sourcePath'
 enabled = true
 
 [plugins."bashlane@rizonetech-local"]
+enabled = true
+
+[plugins."overnight-runner@rizonetech-local"]
 enabled = true
 "@
 

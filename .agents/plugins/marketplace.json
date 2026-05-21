@@ -27,6 +27,18 @@
         "authentication": "ON_INSTALL"
       },
       "category": "Rizonetech"
+    },
+    {
+      "name": "overnight-runner",
+      "source": {
+        "source": "local",
+        "path": "./plugins/overnight-runner"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Rizonetech"
     }
   ]
 }

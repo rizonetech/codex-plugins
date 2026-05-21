@@ -8,6 +8,7 @@ This repository contains the plugin payloads and installer needed to develop and
 
 - [ChromeMCP](plugins/chromemcp-browser)
 - [Bashlane](plugins/bashlane)
+- [Overnight Runner](plugins/overnight-runner)
 
 ## Requirements
 
@@ -35,6 +36,7 @@ The installer creates:
   .agents/plugins/marketplace.json
   plugins/chromemcp-browser/
   plugins/bashlane/
+  plugins/overnight-runner/
 ```
 
 It also updates `~/.codex/config.toml` to enable:
@@ -44,6 +46,9 @@ It also updates `~/.codex/config.toml` to enable:
 enabled = true
 
 [plugins."bashlane@rizonetech-local"]
+enabled = true
+
+[plugins."overnight-runner@rizonetech-local"]
 enabled = true
 ```
 
@@ -85,12 +90,29 @@ can run:
 wsl-run 'pwd && uname -a'
 ```
 
+## Overnight Runner First Run
+
+Overnight Runner adds a reusable skill and helper for long todo-file runs. It
+stores run state in the active project at `.codex/state/overnight-runner.json`
+and probes ChromeMCP at `http://127.0.0.1:8931/healthz` before browser work.
+
+```bash
+python3 ~/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py start todo/example.md
+python3 ~/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py status
+```
+
+If ChromeMCP is not installed, enabled, or running, the runner records a
+ChromeMCP blocker and still allows non-browser work to continue when safe. UI,
+visual, CRUD/GRUD, and production smoke items must stay incomplete until real
+ChromeMCP evidence is captured.
+
 ## Layout
 
 ```text
 plugins/
   chromemcp-browser/  # Codex plugin plus ChromeMCP MCP server/runtime
   bashlane/           # Codex plugin plus wsl-run installer/helper
+  overnight-runner/   # Codex plugin plus long todo guard/helper
 scripts/
   install-rizonetech-local.ps1
 ```

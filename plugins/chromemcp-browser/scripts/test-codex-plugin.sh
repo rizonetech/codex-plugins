@@ -39,6 +39,9 @@ for rel in [
     "plugins/chromemcp-browser/.codex-plugin/icon.svg",
     "plugins/chromemcp-browser/.mcp.json",
     "plugins/bashlane/.codex-plugin/plugin.json",
+    "plugins/overnight-runner/.codex-plugin/plugin.json",
+    "plugins/overnight-runner/scripts/overnight-runner.py",
+    "plugins/overnight-runner/skills/overnight-runner/SKILL.md",
 ]:
     path = root / rel
     if rel.endswith(".json"):
@@ -55,6 +58,7 @@ marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_text()
 plugins = {p["name"]: p for p in marketplace["plugins"]}
 assert plugins["chromemcp-browser"]["source"]["path"] == "./plugins/chromemcp-browser"
 assert plugins["bashlane"]["source"]["path"] == "./plugins/bashlane"
+assert plugins["overnight-runner"]["source"]["path"] == "./plugins/overnight-runner"
 
 mcp = json.loads((root / "plugins/chromemcp-browser/.mcp.json").read_text())
 server = mcp["mcpServers"]["chromemcp-playwright"]
@@ -109,6 +113,8 @@ assert_file "$installed_plugin/.codex-plugin/plugin.json"
 assert_file "$installed_plugin/.codex-plugin/icon.png"
 assert_file "$installed_plugin/.codex-plugin/icon.svg"
 assert_file "$install_root/plugins/bashlane/.codex-plugin/plugin.json"
+assert_file "$install_root/plugins/overnight-runner/.codex-plugin/plugin.json"
+assert_file "$install_root/plugins/overnight-runner/scripts/overnight-runner.py"
 assert_file "$installed_mcp"
 assert_file "$installed_plugin/launcher/Focus-Chrome.ps1"
 assert_file "$installed_plugin/mcp/auth-proxy.js"
@@ -117,6 +123,7 @@ assert_file "$installed_plugin/mcp-status"
 assert_contains "[marketplaces.rizonetech-local]" "$config"
 assert_contains "[plugins.\"chromemcp-browser@rizonetech-local\"]" "$config"
 assert_contains "[plugins.\"bashlane@rizonetech-local\"]" "$config"
+assert_contains "[plugins.\"overnight-runner@rizonetech-local\"]" "$config"
 assert_contains "enabled = true" "$config"
 assert_contains "model = \"gpt-5.5\"" "$config"
 assert_not_contains "chromemcp-local" "$config"
@@ -138,9 +145,11 @@ install_root = Path(sys.argv[1])
 installed_mcp = Path(sys.argv[2])
 marketplace = json.loads((install_root / ".agents/plugins/marketplace.json").read_text())
 plugins = {p["name"]: p for p in marketplace["plugins"]}
-assert set(plugins) == {"chromemcp-browser", "bashlane"}
+assert set(plugins) == {"chromemcp-browser", "bashlane", "overnight-runner"}
 manifest = json.loads((install_root / "plugins/chromemcp-browser/.codex-plugin/plugin.json").read_text())
 assert manifest["interface"]["category"] == "Rizonetech"
+overnight = json.loads((install_root / "plugins/overnight-runner/.codex-plugin/plugin.json").read_text())
+assert overnight["interface"]["category"] == "Rizonetech"
 server = json.loads(installed_mcp.read_text())["mcpServers"]["chromemcp-playwright"]
 assert server["headers"]["Authorization"].startswith("Bearer ")
 PY
