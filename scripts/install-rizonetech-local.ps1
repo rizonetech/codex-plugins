@@ -197,7 +197,7 @@ $chromeDest = Join-Path $pluginsDestRoot "chromemcp-browser"
 $token = $null
 try {
   $wslChromeDest = ConvertTo-WslPath $chromeDest
-  & wsl.exe --cd $wslChromeDest -- bash -lc "chmod +x bridge-check chrome chromemcp mcp-* setup-bridge mcp/*.sh 2>/dev/null || true" | Out-Null
+  & wsl.exe --cd $wslChromeDest -- bash -lc "chmod +x bridge-check chrome chromemcp mcp-* setup-bridge bin/chromemcp-run .codex/scripts/chromemcp-run.py mcp/*.sh 2>/dev/null || true" | Out-Null
   $token = (& wsl.exe --cd $wslChromeDest -- bash -lc "bash ./mcp-token" 2>$null) -join ""
   $token = $token.Trim()
 } catch {
@@ -285,11 +285,27 @@ exec python3 "$script" "$@"
 $overnightRunnerShimPath = Join-Path $toolsRoot "overnight-runner"
 [System.IO.File]::WriteAllText($overnightRunnerShimPath, $overnightRunnerShim.Replace("`r`n", "`n") + "`n", $utf8NoBom)
 
+$chromeMcpRunShim = @'
+#!/usr/bin/env bash
+set -euo pipefail
+
+script="$HOME/.codex/plugins/rizonetech-local/plugins/chromemcp-browser/bin/chromemcp-run"
+if [ ! -f "$script" ]; then
+  echo "ChromeMCP safe runner not found: $script" >&2
+  echo "Run scripts/install-rizonetech-local.ps1 from the codex-plugins repository, then restart Codex." >&2
+  exit 127
+fi
+
+exec bash "$script" "$@"
+'@
+$chromeMcpRunShimPath = Join-Path $toolsRoot "chromemcp-run"
+[System.IO.File]::WriteAllText($chromeMcpRunShimPath, $chromeMcpRunShim.Replace("`r`n", "`n") + "`n", $utf8NoBom)
+
 try {
   $wslToolsRoot = ConvertTo-WslPath $toolsRoot
-  & wsl.exe --cd $wslToolsRoot -- bash -lc "chmod +x overnight-runner 2>/dev/null || true" | Out-Null
+  & wsl.exe --cd $wslToolsRoot -- bash -lc "chmod +x overnight-runner chromemcp-run 2>/dev/null || true" | Out-Null
 } catch {
-  Write-Warning "Could not chmod Overnight Runner helper shim. If using WSL, run: chmod +x ~/.codex/tools/overnight-runner"
+  Write-Warning "Could not chmod helper shims. If using WSL, run: chmod +x ~/.codex/tools/overnight-runner ~/.codex/tools/chromemcp-run"
 }
 
 $configPath = Join-Path $CodexConfigHome "config.toml"

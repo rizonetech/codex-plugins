@@ -13,6 +13,16 @@ ChromeMCP is strongly preferred for user-facing verification. If ChromeMCP is
 not installed, enabled, or running, the guard records a blocker and keeps the
 run honest instead of failing with a hard dependency error.
 
+For ChromeMCP evidence outside a chat-exposed MCP tool, use the installed MCP
+safe runner:
+
+```bash
+~/.codex/tools/chromemcp-run --url "https://example.com" --required --handoff --screenshot
+```
+
+Raw CDP/WebSocket checks are diagnostic only and do not satisfy passed browser
+or production smoke gates.
+
 ## Modules
 
 The runner is project-agnostic. It detects modules from repository markers and

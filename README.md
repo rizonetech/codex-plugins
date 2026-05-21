@@ -38,6 +38,7 @@ The installer creates:
   plugins/bashlane/
   plugins/overnight-runner/
 ~/.codex/tools/
+  chromemcp-run
   overnight-runner
 ```
 
@@ -82,6 +83,13 @@ CDP healthy: yes (...)
 ChromeMCP focuses the visible ChromeMCP Chrome window before browser tool calls
 by default. Set `MCP_VISIBLE_INTERACTIONS=0` before starting the server only if
 you intentionally want background behavior.
+
+When a chat does not expose a direct ChromeMCP MCP tool, use the installed MCP
+safe runner rather than raw CDP:
+
+```bash
+~/.codex/tools/chromemcp-run --url "https://example.com" --required --handoff --screenshot
+```
 
 ## Bashlane First Run
 

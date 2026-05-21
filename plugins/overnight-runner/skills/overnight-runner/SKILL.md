@@ -140,6 +140,21 @@ enabled. If ChromeMCP is missing, unavailable, or not enabled in Codex:
 - continue non-browser work only when it is still useful
 - do not mark user-facing UI, visual QA, CRUD/GRUD, or production smoke complete
 
+Use the supported ChromeMCP MCP client path for browser evidence. Prefer the
+Codex-exposed ChromeMCP MCP tool when it is available in the chat. If no direct
+MCP tool is exposed, use the installed safe runner instead of raw CDP:
+
+```bash
+~/.codex/tools/chromemcp-run --url "https://example.com" --required --handoff --screenshot
+```
+
+Direct CDP, ad hoc WebSocket clients, headless Playwright, or temporary browser
+libraries can be used only for diagnostics. They must be recorded as
+`fallback-cdp` or blocked evidence and must not satisfy `chromemcp_local=passed`
+or production smoke completion. `mcp-plus-cdp-screenshot` counts only when MCP
+tool actions are the primary workflow proof and CDP is used solely to capture
+supplemental screenshots/diagnostics.
+
 Retry the same browser automation step at most twice. After two failures,
 switch to diagnose-blocker mode: capture DOM/snapshot, console, network, URL,
 and any safe database or server evidence, then classify the blocker as `app`,
