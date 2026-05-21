@@ -115,6 +115,7 @@ assert_file "$installed_plugin/.codex-plugin/icon.svg"
 assert_file "$install_root/plugins/bashlane/.codex-plugin/plugin.json"
 assert_file "$install_root/plugins/overnight-runner/.codex-plugin/plugin.json"
 assert_file "$install_root/plugins/overnight-runner/scripts/overnight-runner.py"
+assert_file "$plugin_home/tools/overnight-runner"
 assert_file "$installed_mcp"
 assert_file "$installed_plugin/launcher/Focus-Chrome.ps1"
 assert_file "$installed_plugin/mcp/auth-proxy.js"
@@ -135,6 +136,7 @@ assert_contains "<TOKEN>" plugins/chromemcp-browser/.mcp.json
 assert_contains "process.env.MCP_VISIBLE_INTERACTIONS !== '0'" "$installed_plugin/mcp/auth-proxy.js"
 assert_contains "visibleInteractions" "$installed_plugin/mcp/auth-proxy.js"
 assert_contains "Visible interactions:" "$installed_plugin/mcp-status"
+assert_contains "plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py" "$plugin_home/tools/overnight-runner"
 
 python3 - "$install_root" "$installed_mcp" <<'PY'
 import json

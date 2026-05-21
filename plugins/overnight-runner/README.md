@@ -28,9 +28,9 @@ Multiple modules can be active in one repository, such as Laravel plus Node.
 ## Helper
 
 ```bash
-python3 ~/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py start todo/example.md
-python3 ~/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py preflight todo/example.md
-python3 ~/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py update --slice "Login flow" --gate implemented=passed
-python3 ~/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py finish-check
-python3 ~/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py handoff --write-todo
+~/.codex/tools/overnight-runner start todo/example.md
+~/.codex/tools/overnight-runner preflight todo/example.md
+~/.codex/tools/overnight-runner update --slice "Login flow" --gate implemented=passed
+~/.codex/tools/overnight-runner finish-check
+~/.codex/tools/overnight-runner handoff --write-todo
 ```

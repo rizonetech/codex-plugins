@@ -176,9 +176,11 @@ foreach ($plugin in $plugins) {
 $marketplaceRoot = Join-Path $CodexPluginHome "plugins\rizonetech-local"
 $pluginsDestRoot = Join-Path $marketplaceRoot "plugins"
 $marketplacePath = Join-Path $marketplaceRoot ".agents\plugins\marketplace.json"
+$toolsRoot = Join-Path $CodexPluginHome "tools"
 
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $marketplacePath) | Out-Null
 New-Item -ItemType Directory -Force -Path $pluginsDestRoot | Out-Null
+New-Item -ItemType Directory -Force -Path $toolsRoot | Out-Null
 
 foreach ($plugin in $plugins) {
   $dest = Join-Path $pluginsDestRoot $plugin.Name
@@ -266,6 +268,29 @@ $marketplace = @{
 }
 
 [System.IO.File]::WriteAllText($marketplacePath, ($marketplace | ConvertTo-Json -Depth 10) + "`n", $utf8NoBom)
+
+$overnightRunnerShim = @'
+#!/usr/bin/env bash
+set -euo pipefail
+
+script="$HOME/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py"
+if [ ! -f "$script" ]; then
+  echo "Overnight Runner helper not found: $script" >&2
+  echo "Run scripts/install-rizonetech-local.ps1 from the codex-plugins repository, then restart Codex." >&2
+  exit 127
+fi
+
+exec python3 "$script" "$@"
+'@
+$overnightRunnerShimPath = Join-Path $toolsRoot "overnight-runner"
+[System.IO.File]::WriteAllText($overnightRunnerShimPath, $overnightRunnerShim.Replace("`r`n", "`n") + "`n", $utf8NoBom)
+
+try {
+  $wslToolsRoot = ConvertTo-WslPath $toolsRoot
+  & wsl.exe --cd $wslToolsRoot -- bash -lc "chmod +x overnight-runner 2>/dev/null || true" | Out-Null
+} catch {
+  Write-Warning "Could not chmod Overnight Runner helper shim. If using WSL, run: chmod +x ~/.codex/tools/overnight-runner"
+}
 
 $configPath = Join-Path $CodexConfigHome "config.toml"
 if (-not (Test-Path -LiteralPath $configPath)) {

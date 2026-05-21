@@ -37,6 +37,8 @@ The installer creates:
   plugins/chromemcp-browser/
   plugins/bashlane/
   plugins/overnight-runner/
+~/.codex/tools/
+  overnight-runner
 ```
 
 It also updates `~/.codex/config.toml` to enable:
@@ -97,8 +99,8 @@ stores run state in the active project at `.codex/state/overnight-runner.json`
 and probes ChromeMCP at `http://127.0.0.1:8931/healthz` before browser work.
 
 ```bash
-python3 ~/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py start todo/example.md
-python3 ~/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py status
+~/.codex/tools/overnight-runner start todo/example.md
+~/.codex/tools/overnight-runner status
 ```
 
 If ChromeMCP is not installed, enabled, or running, the runner records a

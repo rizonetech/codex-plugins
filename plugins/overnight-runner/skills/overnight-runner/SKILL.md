@@ -15,25 +15,31 @@ execution, or a final finish check for such a run.
 Resolve the guard helper before starting work:
 
 ```bash
-if [ -f "$HOME/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py" ]; then
-  OR="$HOME/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py"
+if command -v overnight-runner >/dev/null 2>&1; then
+  OR=(overnight-runner)
+elif [ -x "$HOME/.codex/tools/overnight-runner" ]; then
+  OR=("$HOME/.codex/tools/overnight-runner")
+elif [ -f "$HOME/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py" ]; then
+  OR=(python3 "$HOME/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py")
+elif [ -f "$HOME/.codex/plugins/cache/rizonetech-local/overnight-runner/0.1.0/scripts/overnight-runner.py" ]; then
+  OR=(python3 "$HOME/.codex/plugins/cache/rizonetech-local/overnight-runner/0.1.0/scripts/overnight-runner.py")
 elif [ -f "plugins/overnight-runner/scripts/overnight-runner.py" ]; then
-  OR="$PWD/plugins/overnight-runner/scripts/overnight-runner.py"
+  OR=(python3 "$PWD/plugins/overnight-runner/scripts/overnight-runner.py")
 else
-  OR=""
+  OR=()
 fi
 ```
 
 If the helper is missing, continue with the workflow manually and tell the user
-that the state helper is unavailable. Do not pretend gates passed without
-evidence.
+that the state helper is unavailable. Do not fall back to an old project-local
+overnight guard. Do not pretend gates passed without evidence.
 
 ## Start Rule
 
 For explicit overnight or long autonomous todo requests, start with:
 
 ```bash
-python3 "$OR" start path/to/todo.md
+"${OR[@]}" start path/to/todo.md
 ```
 
 If a start preflight records ChromeMCP as blocked, keep going only on work that
@@ -100,7 +106,7 @@ For every slice:
 Example:
 
 ```bash
-python3 "$OR" update \
+"${OR[@]}" update \
   --slice "Settings form" \
   --gate implemented=passed \
   --gate automated_tests=passed \
@@ -180,7 +186,7 @@ Generic module:
 Before final response:
 
 ```bash
-python3 "$OR" finish-check
+"${OR[@]}" finish-check
 ```
 
 Use `--allow-blocked` only when every remaining unchecked item has a concrete
@@ -190,8 +196,8 @@ evidence.
 For handoff:
 
 ```bash
-python3 "$OR" handoff --write-todo
-python3 "$OR" clear "completed overnight run"
+"${OR[@]}" handoff --write-todo
+"${OR[@]}" clear "completed overnight run"
 ```
 
 The final answer should summarize completed slices, verified gates, blockers,
