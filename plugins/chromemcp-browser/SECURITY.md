@@ -18,7 +18,7 @@ and rolled into the next release.
 one of:
 
 1. **GitHub Private Vulnerability Reporting** — preferred — at
-   [`Security` → `Report a vulnerability`](https://github.com/rizonetech/ChromeMCP/security) on this repo.
+   [`Security` → `Report a vulnerability`](https://github.com/rizonetech/codex-plugins/security) on this repo.
 2. **Email** — `security@rizonetech.com`. PGP welcome but not required.
 
 What we ask of you:

@@ -48,29 +48,23 @@ Two things are worth pointing out:
 
 ## Install
 
-```bash
-curl -fsSL https://github.com/rizonetech/ChromeMCP/raw/main/scripts/install.sh | bash
+ChromeMCP is distributed for Codex from the `rizonetech/codex-plugins`
+repository. Install it from PowerShell at the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-rizonetech-local.ps1
 ```
 
-Installs to `~/.local/share/chromemcp/`, symlinks `chromemcp` into `~/.local/bin/`, and runs `npm ci` against the bundled pin. Override with `CHROMEMCP_PREFIX` / `CHROMEMCP_BIN_DIR` env vars. Pin a specific release with `… | bash -s -- --version v0.1.1`. From a local checkout (e.g. while iterating on the installer itself): `bash scripts/install.sh --from-source`.
-
-After install, `chromemcp` is the single command you'll use:
+Then restart Codex and run ChromeMCP from WSL:
 
 ```text
-chromemcp setup-bridge      # one-time Windows-side bridge setup (UAC)
-chromemcp chrome            # launch signed-in Chrome with CDP
-chromemcp up                # start the MCP server
-chromemcp token             # print the bearer token for client config
-chromemcp test              # smoke test
-chromemcp enable            # optional: install systemd user unit so the
-                            # stack auto-restarts on crash + survives logout
-chromemcp status            # health report
-chromemcp logs --grep error # tail / search logs
-chromemcp upgrade           # pull the latest release
-chromemcp uninstall         # remove the install
+cd /path/to/codex-plugins/plugins/chromemcp-browser
+./mcp-up
+./mcp-status
 ```
 
-`chromemcp help` lists every subcommand.
+The `chromemcp` wrapper remains available inside this plugin folder and
+`./chromemcp help` lists every subcommand.
 
 ## Quick start (from a clone)
 
@@ -203,8 +197,9 @@ See [`docs/CODEX_PLUGIN.md`](docs/CODEX_PLUGIN.md) for redistribution notes and 
 │   ├── client-config.json       Drop-in snippet for MCP clients
 │   ├── test.sh                  Smoke test (initialize + browser_tabs + browser_snapshot)
 │   └── demo-visible.sh          Visible-effect demo (opens tab, screenshots, closes)
-├── plugins/chromemcp-browser/   Codex plugin wrapper + MCP config
-└── scripts/install-codex-plugin.sh  Local Codex config installer
+├── .codex-plugin/               Codex plugin manifest and icons
+├── skills/                      Codex skill instructions
+└── scripts/install-codex-plugin.sh  Compatibility wrapper for the monorepo installer
 ```
 
 Every script is idempotent. Re-running `./chrome` while Chrome is already up does nothing. Re-running `./mcp-up` while the server is healthy reports its endpoint and exits zero. Re-running `./setup-bridge` refreshes the portproxy and firewall rule cleanly.

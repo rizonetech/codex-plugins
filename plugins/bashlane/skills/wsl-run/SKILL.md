@@ -32,7 +32,7 @@ This avoids recurring PowerShell differences around `&&`, environment variables,
 The helper should live at:
 
 ```text
-C:\Users\<user>\.codex\tools\wsl-run.ps1
+%USERPROFILE%\.codex\tools\wsl-run.ps1
 ```
 
 The PowerShell profile should expose:

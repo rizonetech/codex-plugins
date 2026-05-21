@@ -9,8 +9,9 @@ http://localhost:8931/mcp
 Start and verify it before configuring clients:
 
 ```bash
-cd /path/to/ChromeMCP
+cd /path/to/codex-plugins/plugins/chromemcp-browser
 ./mcp-up
+./mcp-status
 bash mcp/test.sh
 ```
 

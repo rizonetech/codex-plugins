@@ -1,19 +1,11 @@
 #!/usr/bin/env bash
-# ChromeMCP installer.
+# Legacy ChromeMCP standalone installer.
 #
-# Default (curl|bash) usage — fetches the latest GitHub Release tarball:
-#   curl -fsSL https://github.com/rizonetech/ChromeMCP/raw/main/scripts/install.sh | bash
+# Codex plugin distribution is handled by the repository root installer:
+#   powershell -ExecutionPolicy Bypass -File ./scripts/install-rizonetech-local.ps1
 #
-# Pin a specific release:
-#   curl -fsSL https://github.com/rizonetech/ChromeMCP/raw/main/scripts/install.sh \
-#     | bash -s -- --version v0.1.1
-#
-# From a local checkout (e.g. during dev / testing this very installer):
+# From this plugin checkout (e.g. during dev / testing this legacy installer):
 #   bash scripts/install.sh --from-source
-#
-# Upgrade an existing install:
-#   chromemcp upgrade          # which exec's:
-#   bash scripts/install.sh --upgrade
 #
 # Uninstall:
 #   bash scripts/install.sh --uninstall
@@ -23,8 +15,6 @@
 #                           which is $HOME/.local/share/chromemcp by default)
 #   CHROMEMCP_BIN_DIR       directory for the chromemcp symlink
 #                           (default: $HOME/.local/bin)
-#   CHROMEMCP_REPO_OWNER    GitHub repo owner (default: rizonetech)
-#   CHROMEMCP_REPO_NAME     GitHub repo name (default: ChromeMCP)
 set -euo pipefail
 
 REPO_OWNER="${CHROMEMCP_REPO_OWNER:-rizonetech}"
@@ -49,6 +39,21 @@ for arg in "$@"; do
     *)               echo "install.sh: unknown arg: $arg" >&2; exit 64 ;;
   esac
 done
+
+if [ "$MODE" != "uninstall" ] && [ "$FROM_SOURCE" = "0" ]; then
+  cat >&2 <<'EOF'
+ERROR: release-based ChromeMCP standalone install is not used by codex-plugins.
+
+For Codex plugin setup, run this from the codex-plugins repository root:
+
+  powershell -ExecutionPolicy Bypass -File ./scripts/install-rizonetech-local.ps1
+
+For local ChromeMCP standalone development, run:
+
+  bash scripts/install.sh --from-source
+EOF
+  exit 2
+fi
 
 # --- Prerequisite checks ---------------------------------------------------
 require_cmd() {

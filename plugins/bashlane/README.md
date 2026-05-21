@@ -19,7 +19,7 @@ From PowerShell:
 The installer copies `scripts/wsl-run.ps1` to:
 
 ```text
-C:\Users\<user>\.codex\tools\wsl-run.ps1
+%USERPROFILE%\.codex\tools\wsl-run.ps1
 ```
 
 It also adds a `wsl-run` function to both modern PowerShell and Windows PowerShell profile locations.
