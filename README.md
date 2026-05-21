@@ -13,4 +13,9 @@ This repository does not combine plugin source code. It lists independent plugin
 
 The Codex catalog lives in `.agents/plugins/marketplace.json`. A root-level `marketplace.json` copy is kept for quick viewing.
 
+For local Codex registration, the catalog points at sibling workspace clones:
+
+- `../ChromeMCP/plugins/chromemcp-browser`
+- `../Bashlane`
+
 Both plugins are grouped under the `Rizonetech` category.

@@ -5,10 +5,10 @@
   },
   "plugins": [
     {
-      "name": "chromemcp",
+      "name": "chromemcp-browser",
       "source": {
-        "source": "github",
-        "repo": "rizonetech/ChromeMCP"
+        "source": "local",
+        "path": "../ChromeMCP/plugins/chromemcp-browser"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -19,8 +19,8 @@
     {
       "name": "bashlane",
       "source": {
-        "source": "github",
-        "repo": "rizonetech/Bashlane"
+        "source": "local",
+        "path": "../Bashlane"
       },
       "policy": {
         "installation": "AVAILABLE",
