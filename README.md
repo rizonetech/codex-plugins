@@ -66,3 +66,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-rizonetech-local.ps1 
 ```
 
 The installer also removes older `chromemcp-local` and `bashlane-local` marketplace folders unless `-KeepOldLocalMarketplaces` is provided.
+
+## Browser Smoke Tests
+
+The real browser smoke test is target-driven so this repository does not bake
+in local app names, URLs, or credentials. Copy
+`scripts/real-browser-smoke-targets.example.json` to a private location, point
+it at your own `.secrets` files, then run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test-real-browser.ps1 `
+  -TargetsPath "\\wsl.localhost\Ubuntu\path\to\your-targets.json"
+```
+
+The test brings the ChromeMCP window forward before browser actions by default
+so the run is visible. Pass `-NoVisible` only when you intentionally want a
+background smoke run.

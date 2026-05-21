@@ -1,0 +1,32 @@
+[
+  {
+    "label": "example admin",
+    "url": "https://example.test/admin/login",
+    "auth": {
+      "type": "form",
+      "credentials": {
+        "type": "env",
+        "path": "/absolute/path/to/.secrets/browser.env",
+        "usernameKey": "TEST_EMAIL",
+        "passwordKey": "TEST_PASSWORD"
+      }
+    },
+    "successUrlPattern": "/admin",
+    "browseLimit": 5
+  },
+  {
+    "label": "example console",
+    "url": "https://app.example.test/console/login",
+    "auth": {
+      "type": "form",
+      "credentials": {
+        "type": "json",
+        "path": "/absolute/path/to/.secrets/browser-credentials.json",
+        "usernameKey": "email",
+        "passwordKey": "password"
+      }
+    },
+    "successUrlPattern": "/console",
+    "browseLimit": 5
+  }
+]

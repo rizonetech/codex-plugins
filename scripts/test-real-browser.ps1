@@ -1,7 +1,8 @@
 param(
+  [Parameter(Mandatory = $true)]
+  [string]$TargetsPath,
   [string]$CdpEndpoint = "http://172.28.112.1:9222",
-  [string]$Clientapp2Root = "/home/<user>/www/clientapp2",
-  [string]$ClientappRoot = "/home/<user>/www/clientapp"
+  [switch]$NoVisible
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,19 +31,17 @@ function ConvertTo-WslPath {
 $scriptRoot = Split-Path -Parent $PSCommandPath
 $repoRoot = Split-Path -Parent $scriptRoot
 $wslRepoRoot = ConvertTo-WslPath $repoRoot
-
-if ([string]::IsNullOrWhiteSpace($wslRepoRoot)) {
-  throw "Could not resolve repository path inside WSL."
-}
+$wslTargetsPath = ConvertTo-WslPath $TargetsPath
+$visibleFlag = if ($NoVisible) { "--no-visible" } else { "" }
 
 $command = @"
 set -euo pipefail
 cd "$wslRepoRoot/plugins/chromemcp-browser/mcp"
 npm ci --no-audit --no-fund >/dev/null
-CHROMEMCP_CDP_ENDPOINT="$CdpEndpoint" \
-CLIENTAPP2_ROOT="$Clientapp2Root" \
-CLIENTAPP_ROOT="$ClientappRoot" \
-node "$wslRepoRoot/scripts/real-browser-smoke-test.js"
+node "$wslRepoRoot/scripts/real-browser-smoke-test.js" \
+  --targets "$wslTargetsPath" \
+  --cdp-endpoint "$CdpEndpoint" \
+  $visibleFlag
 "@
 
 & wsl.exe -- bash -lc $command
