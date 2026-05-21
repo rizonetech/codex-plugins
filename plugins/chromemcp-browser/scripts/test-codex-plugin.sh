@@ -110,6 +110,9 @@ assert_file "$installed_plugin/.codex-plugin/icon.png"
 assert_file "$installed_plugin/.codex-plugin/icon.svg"
 assert_file "$install_root/plugins/bashlane/.codex-plugin/plugin.json"
 assert_file "$installed_mcp"
+assert_file "$installed_plugin/launcher/Focus-Chrome.ps1"
+assert_file "$installed_plugin/mcp/auth-proxy.js"
+assert_file "$installed_plugin/mcp-status"
 
 assert_contains "[marketplaces.rizonetech-local]" "$config"
 assert_contains "[plugins.\"chromemcp-browser@rizonetech-local\"]" "$config"
@@ -122,6 +125,9 @@ assert_not_contains "\\old\\ChromeMCP" "$config"
 assert_contains "http://localhost:8931/mcp" "$installed_mcp"
 assert_not_contains "<TOKEN>" "$installed_mcp"
 assert_contains "<TOKEN>" plugins/chromemcp-browser/.mcp.json
+assert_contains "process.env.MCP_VISIBLE_INTERACTIONS !== '0'" "$installed_plugin/mcp/auth-proxy.js"
+assert_contains "visibleInteractions" "$installed_plugin/mcp/auth-proxy.js"
+assert_contains "Visible interactions:" "$installed_plugin/mcp-status"
 
 python3 - "$install_root" "$installed_mcp" <<'PY'
 import json
@@ -139,4 +145,20 @@ server = json.loads(installed_mcp.read_text())["mcpServers"]["chromemcp-playwrig
 assert server["headers"]["Authorization"].startswith("Bearer ")
 PY
 
-echo "PASS codex plugin metadata and monorepo installer"
+if curl -fsS --max-time 3 http://127.0.0.1:8931/healthz >"$tmp/healthz.json" 2>/dev/null; then
+  python3 - "$tmp/healthz.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text())
+visible = data.get("visibleInteractions")
+assert visible, "healthz did not expose visibleInteractions"
+assert visible.get("enabled") is True, "visible interactions are not enabled by default"
+assert str(visible.get("focusScript", "")).endswith("launcher/Focus-Chrome.ps1")
+PY
+else
+  echo "SKIP live visible-interactions health check: ChromeMCP server is not running"
+fi
+
+echo "PASS codex plugin metadata, monorepo installer, and visible defaults"
