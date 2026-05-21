@@ -1,15 +1,14 @@
 param(
   [string]$CodexConfigHome = $env:CODEX_HOME,
   [string]$CodexPluginHome = "",
-  [string]$WorkspaceRoot = "",
-  [switch]$SkipClone,
-  [switch]$KeepOldLocalMarketplaces
+  [switch]$KeepOldLocalMarketplaces,
+  [switch]$SkipToolInstall
 )
 
 $ErrorActionPreference = "Stop"
 
 function ConvertTo-ExtendedPath {
-  param([string]$Path)
+  param([Parameter(Mandatory = $true)][string]$Path)
 
   if ($Path.StartsWith("\\?\")) {
     return $Path
@@ -22,100 +21,151 @@ function ConvertTo-ExtendedPath {
   return "\\?\" + $Path
 }
 
+function ConvertTo-WslPath {
+  param([Parameter(Mandatory = $true)][string]$Path)
+
+  $resolved = [System.IO.Path]::GetFullPath($Path)
+  if ($resolved.StartsWith("\\wsl.localhost\") -or $resolved.StartsWith("\\wsl$\")) {
+    $parts = $resolved.TrimStart("\").Split("\")
+    if ($parts.Length -le 2) {
+      return "/"
+    }
+    return "/" + (($parts | Select-Object -Skip 2) -join "/")
+  }
+
+  if ($resolved -match '^([A-Za-z]):(.*)$') {
+    $drive = $Matches[1].ToLowerInvariant()
+    $rest = $Matches[2] -replace '\\', '/'
+    return "/mnt/$drive$rest"
+  }
+
+  throw "Cannot convert path to WSL path: $resolved"
+}
+
+function Remove-DirectoryInside {
+  param(
+    [Parameter(Mandatory = $true)][string]$Target,
+    [Parameter(Mandatory = $true)][string]$Root
+  )
+
+  if (-not (Test-Path -LiteralPath $Target)) {
+    return
+  }
+
+  $resolvedTarget = [System.IO.Path]::GetFullPath($Target)
+  $resolvedRoot = [System.IO.Path]::GetFullPath($Root)
+
+  if (-not $resolvedTarget.StartsWith($resolvedRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Refusing to remove path outside expected root: $resolvedTarget"
+  }
+
+  Remove-Item -Recurse -Force -LiteralPath $resolvedTarget
+}
+
+function Remove-TomlBlock {
+  param(
+    [AllowEmptyString()][string]$Text,
+    [Parameter(Mandatory = $true)][string]$Header
+  )
+
+  $escapedHeader = [regex]::Escape($Header)
+  return [regex]::Replace($Text, "(?ms)^\[$escapedHeader\]\r?\n.*?(?=^\[|\z)", "")
+}
+
 if ([string]::IsNullOrWhiteSpace($CodexConfigHome)) {
   $CodexConfigHome = Join-Path $HOME ".codex"
 }
 
 $ScriptRoot = Split-Path -Parent $PSCommandPath
-$CatalogRepo = Split-Path -Parent $ScriptRoot
+$RepoRoot = Split-Path -Parent $ScriptRoot
+$SourcePluginsRoot = Join-Path $RepoRoot "plugins"
 
 if ([string]::IsNullOrWhiteSpace($CodexPluginHome)) {
   $CodexPluginHome = $CodexConfigHome
 
-  if ($CatalogRepo -match '^(\\\\wsl\.localhost\\[^\\]+\\home\\[^\\]+)\\') {
-    $CodexPluginHome = Join-Path $Matches[1] ".codex"
+  if ($RepoRoot.StartsWith("\\wsl.localhost\") -or $RepoRoot.StartsWith("\\wsl$\")) {
+    $parts = $RepoRoot.TrimStart("\").Split("\")
+    if ($parts.Length -ge 4 -and $parts[2] -eq "home") {
+      $CodexPluginHome = "\\" + (Join-Path (($parts | Select-Object -First 4) -join "\") ".codex")
+    }
   }
-}
-
-if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
-  $WorkspaceRoot = Split-Path -Parent $CatalogRepo
 }
 
 $CodexConfigHome = [System.IO.Path]::GetFullPath($CodexConfigHome)
 $CodexPluginHome = [System.IO.Path]::GetFullPath($CodexPluginHome)
-$WorkspaceRoot = [System.IO.Path]::GetFullPath($WorkspaceRoot)
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
-$repos = @(
+$plugins = @(
   @{
-    Name = "ChromeMCP"
-    Url = "https://github.com/rizonetech/ChromeMCP.git"
-    Path = Join-Path $WorkspaceRoot "ChromeMCP"
+    Name = "chromemcp-browser"
+    Source = Join-Path $SourcePluginsRoot "chromemcp-browser"
+    Requires = @(".codex-plugin\plugin.json", ".mcp.json")
   },
   @{
-    Name = "Bashlane"
-    Url = "https://github.com/rizonetech/Bashlane.git"
-    Path = Join-Path $WorkspaceRoot "Bashlane"
+    Name = "bashlane"
+    Source = Join-Path $SourcePluginsRoot "bashlane"
+    Requires = @(".codex-plugin\plugin.json", "scripts\install.ps1", "scripts\wsl-run.ps1")
   }
 )
 
-foreach ($repo in $repos) {
-  if (Test-Path $repo.Path) {
-    Write-Host "Using existing $($repo.Name): $($repo.Path)"
-    continue
+foreach ($plugin in $plugins) {
+  if (-not (Test-Path -LiteralPath $plugin.Source)) {
+    throw "Plugin source not found: $($plugin.Source)"
   }
 
-  if ($SkipClone) {
-    throw "$($repo.Name) repo not found at $($repo.Path). Remove -SkipClone or clone it manually."
-  }
-
-  Write-Host "Cloning $($repo.Name) into $($repo.Path)"
-  git clone $repo.Url $repo.Path
-}
-
-$chromePluginSource = Join-Path $repos[0].Path "plugins\chromemcp-browser"
-$bashlanePluginSource = $repos[1].Path
-
-foreach ($required in @(
-  (Join-Path $chromePluginSource ".codex-plugin\plugin.json"),
-  (Join-Path $chromePluginSource ".mcp.json"),
-  (Join-Path $bashlanePluginSource ".codex-plugin\plugin.json")
-)) {
-  if (-not (Test-Path $required)) {
-    throw "Required plugin file not found: $required"
+  foreach ($required in $plugin.Requires) {
+    $requiredPath = Join-Path $plugin.Source $required
+    if (-not (Test-Path -LiteralPath $requiredPath)) {
+      throw "Required plugin file not found: $requiredPath"
+    }
   }
 }
 
 $marketplaceRoot = Join-Path $CodexPluginHome "plugins\rizonetech-local"
-$pluginsRoot = Join-Path $marketplaceRoot "plugins"
+$pluginsDestRoot = Join-Path $marketplaceRoot "plugins"
 $marketplacePath = Join-Path $marketplaceRoot ".agents\plugins\marketplace.json"
-$chromePluginDest = Join-Path $pluginsRoot "chromemcp-browser"
-$bashlanePluginDest = Join-Path $pluginsRoot "bashlane"
 
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $marketplacePath) | Out-Null
-New-Item -ItemType Directory -Force -Path $pluginsRoot | Out-Null
+New-Item -ItemType Directory -Force -Path $pluginsDestRoot | Out-Null
 
-foreach ($target in @($chromePluginDest, $bashlanePluginDest)) {
-  $resolvedRoot = [System.IO.Path]::GetFullPath($marketplaceRoot)
-  if (Test-Path $target) {
-    $resolvedTarget = [System.IO.Path]::GetFullPath($target)
-    if (-not $resolvedTarget.StartsWith($resolvedRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-      throw "Refusing to remove path outside marketplace root: $resolvedTarget"
-    }
-    Remove-Item -Recurse -Force -LiteralPath $resolvedTarget
-  }
-}
+foreach ($plugin in $plugins) {
+  $dest = Join-Path $pluginsDestRoot $plugin.Name
+  Remove-DirectoryInside -Target $dest -Root $pluginsDestRoot
+  Copy-Item -Recurse -Force -LiteralPath $plugin.Source -Destination $dest
 
-Copy-Item -Recurse -Force $chromePluginSource $chromePluginDest
-Copy-Item -Recurse -Force $bashlanePluginSource $bashlanePluginDest -Exclude ".git"
-
-foreach ($manifestPath in @(
-  (Join-Path $chromePluginDest ".codex-plugin\plugin.json"),
-  (Join-Path $bashlanePluginDest ".codex-plugin\plugin.json")
-)) {
-  $manifest = Get-Content -Raw $manifestPath | ConvertFrom-Json
+  $manifestPath = Join-Path $dest ".codex-plugin\plugin.json"
+  $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
   $manifest.interface.category = "Rizonetech"
   [System.IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 20) + "`n", $utf8NoBom)
+}
+
+$chromeDest = Join-Path $pluginsDestRoot "chromemcp-browser"
+$token = $null
+try {
+  $wslChromeDest = ConvertTo-WslPath $chromeDest
+  & wsl.exe --cd $wslChromeDest -- bash -lc "chmod +x bridge-check chrome chromemcp mcp-* setup-bridge mcp/*.sh 2>/dev/null || true" | Out-Null
+  $token = (& wsl.exe --cd $wslChromeDest -- bash -lc "bash ./mcp-token" 2>$null) -join ""
+  $token = $token.Trim()
+} catch {
+  $token = ""
+}
+
+if ([string]::IsNullOrWhiteSpace($token) -or $token.Length -lt 32) {
+  Write-Warning "Could not generate ChromeMCP auth token during install. Leaving placeholder .mcp.json; run plugins/chromemcp-browser/mcp-token and update .mcp.json before enabling MCP auth."
+} else {
+  $mcpConfig = @{
+    mcpServers = @{
+      "chromemcp-playwright" = @{
+        type = "http"
+        url = "http://localhost:8931/mcp"
+        headers = @{
+          Authorization = "Bearer $token"
+        }
+        note = "Local ChromeMCP Playwright MCP server. Start it with plugins/chromemcp-browser/mcp-up before use. Token generated by plugins/chromemcp-browser/mcp-token."
+      }
+    }
+  }
+  [System.IO.File]::WriteAllText((Join-Path $chromeDest ".mcp.json"), ($mcpConfig | ConvertTo-Json -Depth 10) + "`n", $utf8NoBom)
 }
 
 $marketplace = @{
@@ -151,36 +201,42 @@ $marketplace = @{
   )
 }
 
-$marketplaceJson = $marketplace | ConvertTo-Json -Depth 10
-[System.IO.File]::WriteAllText($marketplacePath, $marketplaceJson + "`n", $utf8NoBom)
+[System.IO.File]::WriteAllText($marketplacePath, ($marketplace | ConvertTo-Json -Depth 10) + "`n", $utf8NoBom)
 
 $configPath = Join-Path $CodexConfigHome "config.toml"
-if (-not (Test-Path $configPath)) {
+if (-not (Test-Path -LiteralPath $configPath)) {
   New-Item -ItemType File -Force -Path $configPath | Out-Null
 }
 
-$config = Get-Content -Raw $configPath
-$removeBlocks = @(
-  '(?ms)^# ChromeMCP local Codex marketplace\.\r?\n\[marketplaces\.chromemcp-local\].*?(?=^\[|\z)',
-  '(?ms)^\[marketplaces\.chromemcp-local\].*?(?=^\[|\z)',
-  '(?ms)^\[plugins\."chromemcp-browser@chromemcp-local"\].*?(?=^\[|\z)',
-  '(?ms)^# Bashlane local Codex marketplace\.\r?\n\[marketplaces\.bashlane-local\].*?(?=^\[|\z)',
-  '(?ms)^\[marketplaces\.bashlane-local\].*?(?=^\[|\z)',
-  '(?ms)^\[plugins\."bashlane@bashlane-local"\].*?(?=^\[|\z)',
-  '(?ms)^# Rizonetech Codex plugin catalog\.\r?\n\[marketplaces\.rizonetech-codex-plugins\].*?(?=^\[|\z)',
-  '(?ms)^\[marketplaces\.rizonetech-codex-plugins\].*?(?=^\[|\z)',
-  '(?ms)^# Rizonetech local Codex marketplace\.\r?\n\[marketplaces\.rizonetech-local\].*?(?=^\[|\z)',
-  '(?ms)^\[marketplaces\.rizonetech-local\].*?(?=^\[|\z)',
-  '(?ms)^\[plugins\."chromemcp-browser@rizonetech-local"\].*?(?=^\[|\z)',
-  '(?ms)^\[plugins\."bashlane@rizonetech-local"\].*?(?=^\[|\z)'
+$config = Get-Content -Raw -LiteralPath $configPath
+if ($null -eq $config) {
+  $config = ""
+}
+$commentPatterns = @(
+  '(?ms)^# ChromeMCP local Codex marketplace\.\r?\n',
+  '(?ms)^# Bashlane local Codex marketplace\.\r?\n',
+  '(?ms)^# Rizonetech Codex plugin catalog\.\r?\n',
+  '(?ms)^# Rizonetech local Codex marketplace\.\r?\n'
 )
 
-foreach ($pattern in $removeBlocks) {
+foreach ($pattern in $commentPatterns) {
   $config = [regex]::Replace($config, $pattern, "")
 }
 
-$sourcePath = ConvertTo-ExtendedPath $marketplaceRoot
+foreach ($header in @(
+  'marketplaces.chromemcp-local',
+  'plugins."chromemcp-browser@chromemcp-local"',
+  'marketplaces.bashlane-local',
+  'plugins."bashlane@bashlane-local"',
+  'marketplaces.rizonetech-codex-plugins',
+  'marketplaces.rizonetech-local',
+  'plugins."chromemcp-browser@rizonetech-local"',
+  'plugins."bashlane@rizonetech-local"'
+)) {
+  $config = Remove-TomlBlock -Text $config -Header $header
+}
 
+$sourcePath = ConvertTo-ExtendedPath $marketplaceRoot
 $block = @"
 
 # Rizonetech local Codex marketplace.
@@ -198,20 +254,15 @@ enabled = true
 [System.IO.File]::WriteAllText($configPath, $config.TrimEnd() + $block + "`r`n", $utf8NoBom)
 
 if (-not $KeepOldLocalMarketplaces) {
-  foreach ($old in @(
-    (Join-Path $CodexPluginHome "plugins\chromemcp-local"),
-    (Join-Path $CodexPluginHome "plugins\bashlane-local")
-  )) {
-    if (Test-Path $old) {
-      $resolvedOld = [System.IO.Path]::GetFullPath($old)
-      $resolvedPlugins = [System.IO.Path]::GetFullPath((Join-Path $CodexPluginHome "plugins"))
-      if (-not $resolvedOld.StartsWith($resolvedPlugins, [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Refusing to remove path outside Codex plugins root: $resolvedOld"
-      }
-      Remove-Item -Recurse -Force -LiteralPath $resolvedOld
-      Write-Host "Removed old local marketplace: $resolvedOld"
-    }
+  foreach ($oldName in @("chromemcp-local", "bashlane-local")) {
+    $old = Join-Path (Join-Path $CodexPluginHome "plugins") $oldName
+    Remove-DirectoryInside -Target $old -Root (Join-Path $CodexPluginHome "plugins")
   }
+}
+
+if (-not $SkipToolInstall) {
+  $bashlaneInstaller = Join-Path $pluginsDestRoot "bashlane\scripts\install.ps1"
+  & powershell -ExecutionPolicy Bypass -File $bashlaneInstaller
 }
 
 Write-Host "Installed Rizonetech local marketplace: $marketplaceRoot"

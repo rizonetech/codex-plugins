@@ -1,0 +1,35 @@
+{
+  "name": "bashlane",
+  "version": "1.0.1",
+  "description": "Keep Codex PowerShell sessions as a thin Bash lane into WSL.",
+  "author": {
+    "name": "Derick Payne"
+  },
+  "license": "MIT",
+  "keywords": [
+    "wsl",
+    "powershell",
+    "shell",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Bashlane",
+    "shortDescription": "Route Codex command work from PowerShell into WSL.",
+    "longDescription": "Bashlane adds a global workflow for Codex chats launched through PowerShell: keep file edits in Codex, but run searches, tests, builds, git inspection, and other command-line work through the wsl-run helper so Linux project semantics stay intact across chats and workspaces.",
+    "developerName": "Rizonetech",
+    "category": "Rizonetech",
+    "capabilities": [
+      "Shell",
+      "Workflow"
+    ],
+    "defaultPrompt": [
+      "Use Bashlane for command work in this PowerShell-backed workspace.",
+      "Refresh the global wsl-run helper from Bashlane.",
+      "Explain how Codex should use PowerShell as a thin transport layer for WSL commands."
+    ],
+    "brandColor": "#2563EB",
+    "composerIcon": "./.codex-plugin/icon.svg",
+    "logo": "./.codex-plugin/icon.png"
+  }
+}

@@ -1,0 +1,48 @@
+[Unit]
+Description=ChromeMCP — Playwright MCP behind an auth proxy
+Documentation=file://__REPO_ROOT__/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# mcp-up --foreground does the WSL↔Windows pre-flight (Chrome auto-launch,
+# bridge install / drift-heal) and then exec's auth-proxy.js as PID 1
+# inside the service cgroup.
+ExecStart=__REPO_ROOT__/mcp-up --foreground
+WorkingDirectory=__REPO_ROOT__
+
+# Readiness gate: /healthz bypasses the bearer-token check and returns 200
+# once the auth proxy is listening on the public port. --retry-connrefused
+# absorbs the brief window between exec and listen().
+ExecStartPost=/usr/bin/curl --fail --silent --show-error \
+              --max-time 5 \
+              --retry 30 --retry-delay 1 --retry-connrefused \
+              -o /dev/null \
+              http://127.0.0.1:8931/healthz
+
+# Stop via the existing tear-down path so the @playwright/mcp child gets
+# the same SIGTERM it would from `./mcp-down`.
+ExecStop=__REPO_ROOT__/mcp-down
+
+# Restart policy. RestartSec=3 keeps the kill→restart cycle under the
+# G3 acceptance criterion of 10s (3s wait + ~3-5s startup).
+Restart=on-failure
+RestartSec=3
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# 143 = 128 + SIGTERM. Treat clean SIGTERM from `systemctl stop` as success
+# so we don't trip the restart counter on intentional shutdowns.
+SuccessExitStatus=0 143
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+# stdout/stderr go to the journal (use `journalctl --user -u chromemcp`).
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=chromemcp
+
+[Install]
+WantedBy=default.target

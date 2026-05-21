@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Project root wrapper: starts the ChromeMCP Playwright MCP server.
+#
+# Routing:
+#   * If the chromemcp.service systemd user unit is installed and enabled,
+#     route through `systemctl --user start chromemcp` and tail the journal
+#     briefly so the user gets the same kind of startup feedback as the
+#     ad-hoc path.
+#   * Otherwise, exec mcp/start.sh (ad-hoc setsid+nohup background mode).
+#   * --foreground / -f forces ad-hoc foreground mode (used by the systemd
+#     unit's ExecStart; safe to call directly for debugging).
+set -euo pipefail
+
+SELF="$(readlink -f "$0")"
+REPO_ROOT="$(dirname "$SELF")"
+UNIT_NAME="chromemcp.service"
+
+# Forward --foreground / -f straight to start.sh (the supervised path
+# itself ultimately calls back into here with --foreground).
+for arg in "$@"; do
+  case "$arg" in
+    --foreground|-f)
+      exec bash "$REPO_ROOT/mcp/start.sh" "$@"
+      ;;
+  esac
+done
+
+# Check supervised mode: unit installed AND systemd --user reachable.
+if systemctl --user is-system-running >/dev/null 2>&1 \
+   && systemctl --user list-unit-files --type=service 2>/dev/null | grep -q "^$UNIT_NAME"; then
+  echo "Starting ChromeMCP via systemd ($UNIT_NAME)..."
+  systemctl --user start "$UNIT_NAME"
+  systemctl --user status "$UNIT_NAME" --no-pager --lines=6 || true
+  echo ""
+  echo "Tail logs:   journalctl --user -u $UNIT_NAME -f"
+  echo "Stop:        ./mcp-down   (routes to 'systemctl --user stop')"
+  exit 0
+fi
+
+exec bash "$REPO_ROOT/mcp/start.sh" "$@"

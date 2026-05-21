@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# Verifies the WSL<->Windows CDP bridge is still pointed at this WSL distro's
+# current gateway IP. Exits:
+#   0  bridge listenaddress == current WSL gateway IP (healthy)
+#   1  bridge listenaddress != current WSL gateway IP (drift)
+#   2  no portproxy entry found on the port (bridge not installed)
+#   3  unable to query Windows side (interop broken)
+#
+# Pass --fix to automatically trigger ./setup-bridge /refresh on drift.
+#
+# Usage:
+#   ./bridge-check          - report state, no changes
+#   ./bridge-check --fix    - report state; on drift, run setup-bridge /refresh
+set -euo pipefail
+
+PORT="${BRIDGE_PORT:-9222}"
+FIX=0
+for arg in "$@"; do
+  case "$arg" in
+    --fix)  FIX=1 ;;
+    --help|-h)
+      sed -n '1,15p' "$0"
+      exit 0
+      ;;
+    *)
+      echo "ERROR: unknown argument: $arg" >&2
+      exit 64
+      ;;
+  esac
+done
+
+DIR="$(dirname "$(readlink -f "$0")")"
+
+# --- Locate powershell.exe ------------------------------------------------
+POWERSHELL_EXE="$(command -v powershell.exe 2>/dev/null || true)"
+if [ -z "$POWERSHELL_EXE" ]; then
+  for candidate in \
+    /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe \
+    /mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/powershell.exe
+  do
+    if [ -x "$candidate" ]; then POWERSHELL_EXE="$candidate"; break; fi
+  done
+fi
+if [ -z "$POWERSHELL_EXE" ]; then
+  echo "ERROR: powershell.exe not found. Ensure WSL Windows interop is enabled." >&2
+  exit 3
+fi
+
+# --- Current WSL gateway IP ----------------------------------------------
+GATEWAY="$(ip route show | awk '/^default/ {print $3}')"
+if [ -z "$GATEWAY" ]; then
+  echo "ERROR: could not determine WSL gateway IP from 'ip route'." >&2
+  exit 3
+fi
+
+# --- Read portproxy state from Windows side -------------------------------
+# 'netsh interface portproxy show v4tov4' does NOT require admin to read.
+# Output format (after a header):
+#     Address         Port        Address         Port
+#     --------------- ----------  --------------- ----------
+#     172.28.112.1    9222        127.0.0.1       9222
+NETSH_OUT="$("$POWERSHELL_EXE" -NoProfile -Command 'netsh interface portproxy show v4tov4' 2>/dev/null | tr -d '\r')"
+
+# Extract listen IPs whose listen-port matches $PORT.
+LISTEN_IPS="$(printf '%s\n' "$NETSH_OUT" \
+  | awk -v p="$PORT" '$2 == p && $1 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ {print $1}' \
+  | sort -u)"
+
+if [ -z "$LISTEN_IPS" ]; then
+  echo "Bridge NOT INSTALLED — no portproxy entry found on port $PORT."
+  echo "  Current WSL gateway IP: $GATEWAY"
+  echo "  Fix: run ./setup-bridge"
+  exit 2
+fi
+
+# Multiple listen IPs is itself drift (stale entries from past sessions).
+COUNT="$(printf '%s\n' "$LISTEN_IPS" | wc -l | tr -d ' ')"
+MATCH=0
+if printf '%s\n' "$LISTEN_IPS" | grep -qxF "$GATEWAY"; then
+  MATCH=1
+fi
+
+if [ "$MATCH" = "1" ] && [ "$COUNT" = "1" ]; then
+  echo "Bridge OK at ${GATEWAY}:${PORT}"
+  exit 0
+fi
+
+# --- Drift case -----------------------------------------------------------
+echo "Bridge DRIFT detected:"
+echo "  Current WSL gateway IP : $GATEWAY"
+echo "  Bridge listenaddress(es): $(printf '%s' "$LISTEN_IPS" | tr '\n' ' ')"
+if [ "$FIX" = "1" ]; then
+  echo ""
+  echo "Auto-fix: running ./setup-bridge /refresh ..."
+  echo "  Approve the UAC prompt on your Windows desktop."
+  "$DIR/setup-bridge" /refresh || {
+    echo "ERROR: setup-bridge /refresh failed." >&2
+    exit 1
+  }
+  echo ""
+  echo "Re-checking..."
+  exec "$0"
+else
+  echo ""
+  echo "Fix: run './bridge-check --fix' (or './setup-bridge /refresh' directly)."
+fi
+exit 1

@@ -1,8 +1,8 @@
 # Rizonetech Codex Plugins
 
-Local Codex marketplace installer for Rizonetech plugins.
+Self-contained Codex marketplace for Rizonetech plugins.
 
-This repository does not combine plugin source code. It installs independent plugin repositories into one local Codex marketplace so they appear together in the Codex plugins interface.
+This repository contains the plugin payloads and installer needed to develop and install the Rizonetech Codex plugins from one place.
 
 ## Plugins
 
@@ -16,8 +16,6 @@ From PowerShell:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install-rizonetech-local.ps1
 ```
-
-If sibling `ChromeMCP` or `Bashlane` repositories are missing, the installer clones them from GitHub before creating the local marketplace.
 
 The installer creates:
 
@@ -39,3 +37,32 @@ enabled = true
 ```
 
 Both plugins are grouped under the `Rizonetech` category.
+
+## Layout
+
+```text
+plugins/
+  chromemcp-browser/  # Codex plugin plus ChromeMCP MCP server/runtime
+  bashlane/           # Codex plugin plus wsl-run installer/helper
+scripts/
+  install-rizonetech-local.ps1
+```
+
+Develop plugin changes directly in `plugins/`, then rerun the installer to refresh the local Codex marketplace.
+
+## Clean Installs
+
+The installer derives paths from its own location and from Codex defaults:
+
+- Codex config: `$env:CODEX_HOME` or `$HOME\.codex`
+- Codex plugin cache: `$HOME\.codex`, or the matching WSL home when the repo is run from `\\wsl.localhost\...`
+
+Override either path when needed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-rizonetech-local.ps1 `
+  -CodexConfigHome "$HOME\.codex" `
+  -CodexPluginHome "\\wsl.localhost\Ubuntu\home\you\.codex"
+```
+
+The installer also removes older `chromemcp-local` and `bashlane-local` marketplace folders unless `-KeepOldLocalMarketplaces` is provided.

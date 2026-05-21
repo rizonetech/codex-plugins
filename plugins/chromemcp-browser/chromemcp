@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# chromemcp — unified CLI for the ChromeMCP stack.
+#
+# Dispatches to the per-action wrappers that live next to this script
+# (mcp-up, mcp-down, mcp-status, mcp-logs, mcp-token, bridge-check,
+# chrome, setup-bridge, mcp-enable, mcp-disable). After install.sh runs,
+# this is the only entry that's on PATH — everything else stays inside
+# the install dir.
+set -euo pipefail
+
+SELF="$(readlink -f "$0")"
+DIR="$(dirname "$SELF")"
+
+print_version() {
+  if [ -r "$DIR/VERSION" ]; then
+    cat "$DIR/VERSION"
+  elif [ -r "$DIR/mcp/package.json" ]; then
+    sed -n 's/.*"version":[[:space:]]*"\([^"]*\)".*/\1/p' "$DIR/mcp/package.json" | head -1
+  else
+    echo "(dev)"
+  fi
+}
+
+print_help() {
+  cat <<'HELP'
+chromemcp — Windows-side Chrome controlled from WSL2 via MCP
+
+Usage:
+  chromemcp <subcommand> [args...]
+
+Lifecycle:
+  up [--foreground]              start the MCP server
+                                 (routes through systemd if `enable` ran)
+  down                           stop the MCP server
+  status                         health report (mode-aware)
+  logs [--all|--grep <p>]        tail the server logs
+
+Setup:
+  setup-bridge [/refresh|/remove]
+                                 install / refresh / remove the
+                                 Windows-side WSL ↔ Chrome bridge
+                                 (triggers a UAC prompt)
+  enable                         install the systemd user unit so the
+                                 stack auto-restarts on crash + survives
+                                 logout
+  disable                        remove the systemd user unit
+  chrome [args...]               launch Chrome on Windows with CDP +
+                                 the project profile
+  bridge-check [--fix]           diagnose (and optionally repair) bridge
+                                 drift across WSL2 IP changes
+  token [--rotate|--path|--header]
+                                 print / manage the bearer auth token
+
+Verification:
+  test                           run the smoke test (mcp/test.sh)
+  demo                           visible-effect demo (opens a tab,
+                                 screenshots, closes)
+  codex-plugin-test              validate Codex plugin metadata + installer
+
+Maintenance:
+  codex-plugin-install           install/update the local Codex plugin
+  upgrade                        check for + install the latest release
+  uninstall                      remove the chromemcp install
+  version                        print the installed version
+  help                           this help
+
+Environment overrides honoured by subcommands:
+  PORT / HOST / UPSTREAM_PORT
+  MCP_AUTH_TOKEN / MCP_NO_AUTH / MCP_TOKEN_PATH
+  MCP_CDP_PROBE_INTERVAL_MS / MCP_NO_AUTO_CHROME / MCP_NO_AUTO_BRIDGE
+  MCP_LOG_LEVEL / MCP_LOG_FORMAT / MCP_LOG_MAX_MB / MCP_LOG_KEEP
+  MCP_CHROME_MIN_MAJOR / MCP_CHROME_MAX_MAJOR
+
+See <install-dir>/README.md for the full manual.
+HELP
+}
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  up|start)
+    exec bash "$DIR/mcp-up" "$@"
+    ;;
+  down|stop)
+    exec bash "$DIR/mcp-down" "$@"
+    ;;
+  status)
+    exec bash "$DIR/mcp-status" "$@"
+    ;;
+  logs|log)
+    exec bash "$DIR/mcp-logs" "$@"
+    ;;
+  token)
+    exec bash "$DIR/mcp-token" "$@"
+    ;;
+  enable|install-service)
+    exec bash "$DIR/mcp-enable" "$@"
+    ;;
+  disable|uninstall-service)
+    exec bash "$DIR/mcp-disable" "$@"
+    ;;
+  bridge|bridge-check)
+    exec bash "$DIR/bridge-check" "$@"
+    ;;
+  setup-bridge)
+    exec bash "$DIR/setup-bridge" "$@"
+    ;;
+  chrome)
+    exec bash "$DIR/chrome" "$@"
+    ;;
+  test|smoketest)
+    exec bash "$DIR/mcp/test.sh" "$@"
+    ;;
+  demo)
+    exec bash "$DIR/mcp/demo-visible.sh" "$@"
+    ;;
+  codex-plugin-install|install-codex-plugin)
+    exec bash "$DIR/scripts/install-codex-plugin.sh" "$@"
+    ;;
+  codex-plugin-test|test-codex-plugin)
+    exec bash "$DIR/scripts/test-codex-plugin.sh" "$@"
+    ;;
+  upgrade)
+    if [ ! -x "$DIR/scripts/install.sh" ]; then
+      echo "ERROR: scripts/install.sh not found under $DIR — your install is incomplete." >&2
+      exit 1
+    fi
+    exec bash "$DIR/scripts/install.sh" --upgrade "$@"
+    ;;
+  uninstall)
+    if [ ! -x "$DIR/scripts/install.sh" ]; then
+      echo "ERROR: scripts/install.sh not found under $DIR." >&2
+      exit 1
+    fi
+    exec bash "$DIR/scripts/install.sh" --uninstall "$@"
+    ;;
+  version|--version|-v)
+    print_version
+    ;;
+  help|--help|-h)
+    print_help
+    ;;
+  *)
+    echo "chromemcp: unknown subcommand '$cmd'. Try 'chromemcp help'." >&2
+    exit 2
+    ;;
+esac

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Project root wrapper: stops the ChromeMCP Playwright MCP server.
+#
+# Routes to `systemctl --user stop chromemcp` when the unit is installed,
+# otherwise to mcp/stop.sh (PID-file kill).
+set -euo pipefail
+
+SELF="$(readlink -f "$0")"
+REPO_ROOT="$(dirname "$SELF")"
+UNIT_NAME="chromemcp.service"
+
+if systemctl --user is-system-running >/dev/null 2>&1 \
+   && systemctl --user list-unit-files --type=service 2>/dev/null | grep -q "^$UNIT_NAME"; then
+  if systemctl --user is-active --quiet "$UNIT_NAME"; then
+    echo "Stopping ChromeMCP via systemd..."
+    systemctl --user stop "$UNIT_NAME"
+    echo "Stopped."
+  else
+    echo "Service $UNIT_NAME is not active."
+  fi
+  exit 0
+fi
+
+exec bash "$REPO_ROOT/mcp/stop.sh" "$@"

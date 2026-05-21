@@ -1,0 +1,12 @@
+{
+  "_comment": "Drop the chromemcp-playwright entry into your MCP client's config to connect to this project's shared Playwright MCP server. Common locations: ~/.claude.json (Claude Code), .mcp.json in a project root, ~/.cursor/mcp.json (Cursor). Only the inner mcpServers entry needs to be merged into existing files. The /mcp path uses the modern Streamable HTTP transport; older clients can target /sse instead. SUBSTITUTE <TOKEN> with the output of  ./mcp-token  (or cat ~/.config/chromemcp/token).",
+  "mcpServers": {
+    "chromemcp-playwright": {
+      "type": "http",
+      "url": "http://localhost:8931/mcp",
+      "headers": {
+        "Authorization": "Bearer <TOKEN>"
+      }
+    }
+  }
+}

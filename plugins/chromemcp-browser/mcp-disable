@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Stop and uninstall the chromemcp systemd user unit, reverting to ad-hoc
+# foreground / nohup management via mcp-up / mcp-down.
+#
+# Linger is NOT touched (it's an account-wide setting; we leave it for the
+# user to manage). Run `loginctl disable-linger $USER` manually if desired.
+set -euo pipefail
+
+UNIT_NAME="chromemcp.service"
+UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+UNIT_PATH="$UNIT_DIR/$UNIT_NAME"
+
+if ! systemctl --user is-system-running >/dev/null 2>&1; then
+  echo "systemd --user is not running here. Nothing to disable."
+  exit 0
+fi
+
+if systemctl --user list-unit-files --type=service 2>/dev/null | grep -q "^$UNIT_NAME"; then
+  systemctl --user disable --now "$UNIT_NAME" 2>/dev/null || true
+fi
+
+if [ -f "$UNIT_PATH" ]; then
+  rm -f "$UNIT_PATH"
+  echo "Removed unit: $UNIT_PATH"
+fi
+
+systemctl --user daemon-reload
+systemctl --user reset-failed "$UNIT_NAME" 2>/dev/null || true
+
+echo "ChromeMCP service uninstalled."
+echo "  Next  ./mcp-up  will start the server in ad-hoc background mode."
+echo "  (Linger setting for $USER unchanged. Run 'loginctl disable-linger $USER' to undo.)"

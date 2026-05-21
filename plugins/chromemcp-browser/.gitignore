@@ -1,0 +1,26 @@
+# Chrome profile lives in %LOCALAPPDATA%\ChromeMCP\Profile (out-of-tree).
+# Nothing browser-related belongs in this repo.
+
+# MCP server runtime state
+mcp/node_modules/
+mcp/logs/
+mcp/.*.pid
+mcp/.playwright-mcp/
+mcp/demo-output/
+
+# Python bytecode (from mcp/tests/)
+__pycache__/
+*.pyc
+
+# Test-run scratch
+/tmp/mcp-test-*.out
+
+# Local-only implementation notes, app-specific smoke runners, and evidence.
+.local/
+/todo/
+/mcp/todo-04-*
+/mcp/*-todo*.png
+
+# OS junk
+Thumbs.db
+.DS_Store

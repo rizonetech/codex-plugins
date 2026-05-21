@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "chromemcp-playwright": {
+      "type": "http",
+      "url": "http://localhost:8931/mcp",
+      "headers": {
+        "Authorization": "Bearer <TOKEN>"
+      },
+      "note": "Local ChromeMCP Playwright MCP server. Start it with ./mcp-up before use. SUBSTITUTE <TOKEN> with the output of ./mcp-token. Or set MCP_NO_AUTH=1 in the server env to disable auth (NOT recommended outside single-user dev boxes)."
+    }
+  }
+}

@@ -1,0 +1,17 @@
+/.gitattributes text eol=lf
+*.sh text eol=lf
+*.bash text eol=lf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.js text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+plugins/chromemcp-browser/chrome text eol=lf
+plugins/chromemcp-browser/chromemcp text eol=lf
+plugins/chromemcp-browser/bridge-check text eol=lf
+plugins/chromemcp-browser/mcp-* text eol=lf
+plugins/chromemcp-browser/setup-bridge text eol=lf
+plugins/chromemcp-browser/bin/* text eol=lf

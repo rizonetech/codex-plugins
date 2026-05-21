@@ -1,0 +1,46 @@
+{
+  "name": "chromemcp-browser",
+  "version": "0.1.0",
+  "description": "Control the shared Windows ChromeMCP browser through the local Playwright MCP endpoint.",
+  "author": {
+    "name": "Rizonetech (Pty) Ltd",
+    "email": "derick@rizonetech.com",
+    "url": "https://rizonetech.com"
+  },
+  "homepage": "https://github.com/rizonetech/chromemcp",
+  "repository": "https://github.com/rizonetech/chromemcp",
+  "license": "MIT",
+  "keywords": [
+    "chrome",
+    "browser",
+    "mcp",
+    "playwright",
+    "wsl"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "ChromeMCP Browser",
+    "shortDescription": "Drive a shared signed-in Windows Chrome from Codex",
+    "longDescription": "ChromeMCP Browser exposes the local ChromeMCP Playwright MCP server to Codex, giving agents a callable browser tool backed by a persistent Windows Chrome profile over CDP.",
+    "developerName": "Rizonetech",
+    "category": "Engineering",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://rizonetech.com",
+    "privacyPolicyURL": "https://rizonetech.com",
+    "termsOfServiceURL": "https://rizonetech.com",
+    "defaultPrompt": [
+      "Use ChromeMCP to test my local app",
+      "Open this page in the shared Chrome browser",
+      "Run a browser smoke test with ChromeMCP"
+    ],
+    "brandColor": "#1F6FEB",
+    "composerIcon": "./.codex-plugin/icon.png",
+    "logo": "./.codex-plugin/icon.svg",
+    "screenshots": []
+  }
+}

@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# Tail or grep the ChromeMCP server logs.
+#
+# Routing:
+#   * Supervised mode (chromemcp.service installed) -> journalctl --user
+#     (use --file to force file-based mode for old logs from a previous
+#     ad-hoc run).
+#   * Ad-hoc mode -> tail/grep mcp/logs/playwright-mcp.log (and rotated
+#     copies with --all).
+#
+# Usage:
+#   ./mcp-logs                       tail -f the active log (mode auto-detected)
+#   ./mcp-logs --all                 include rotated files (.1..N) in the tail
+#   ./mcp-logs --grep <pattern>      grep across active + rotated
+#   ./mcp-logs --file                force file-based view (ignore journal)
+#   ./mcp-logs --journal             force journalctl (only if supervised)
+#   ./mcp-logs --since "10 min ago"  passed through to journalctl when used
+#                                    against the journal
+set -euo pipefail
+
+SELF="$(readlink -f "$0")"
+REPO_ROOT="$(dirname "$SELF")"
+UNIT_NAME="chromemcp.service"
+LOG_FILE="$REPO_ROOT/mcp/logs/playwright-mcp.log"
+
+MODE="auto"
+INCLUDE_ROTATED=0
+GREP_PATTERN=""
+SINCE=""
+declare -a EXTRA=()
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --all|-a)     INCLUDE_ROTATED=1 ; shift ;;
+    --file)       MODE="file" ; shift ;;
+    --journal)    MODE="journal" ; shift ;;
+    --grep|-g)    GREP_PATTERN="$2" ; shift 2 ;;
+    --since)      SINCE="$2" ; shift 2 ;;
+    --help|-h)
+      sed -n '1,20p' "$SELF" ; exit 0 ;;
+    --)           shift; EXTRA+=("$@") ; break ;;
+    *)            EXTRA+=("$1") ; shift ;;
+  esac
+done
+
+is_supervised() {
+  systemctl --user is-system-running >/dev/null 2>&1 || return 1
+  systemctl --user list-unit-files --type=service 2>/dev/null | grep -q "^$UNIT_NAME"
+}
+
+if [ "$MODE" = "auto" ]; then
+  if is_supervised; then MODE="journal"; else MODE="file"; fi
+fi
+
+if [ "$MODE" = "journal" ]; then
+  if ! is_supervised; then
+    echo "ERROR: --journal requires the chromemcp systemd unit to be installed (run ./mcp-enable first)." >&2
+    exit 2
+  fi
+  if [ -n "$GREP_PATTERN" ]; then
+    journalctl --user -u "$UNIT_NAME" --no-pager ${SINCE:+--since "$SINCE"} "${EXTRA[@]}" | grep -E -- "$GREP_PATTERN"
+  else
+    journalctl --user -u "$UNIT_NAME" -f --no-pager ${SINCE:+--since "$SINCE"} "${EXTRA[@]}"
+  fi
+  exit 0
+fi
+
+# File-based mode.
+if [ ! -f "$LOG_FILE" ] && [ "$INCLUDE_ROTATED" = "0" ] && [ -z "$GREP_PATTERN" ]; then
+  echo "ERROR: $LOG_FILE not present and --all not specified." >&2
+  echo "  Run ./mcp-up first, or use --journal if the service is supervised." >&2
+  exit 2
+fi
+
+if [ -n "$GREP_PATTERN" ]; then
+  # Grep across the active log and any rotated copies (oldest -> newest).
+  shopt -s nullglob
+  ROTATED=( "$LOG_FILE".[0-9]* )
+  shopt -u nullglob
+  # Sort numerically descending (.5 .4 .3 .2 .1) so output is oldest-first
+  # when followed by the active log.
+  if [ "${#ROTATED[@]}" -gt 0 ]; then
+    SORTED=()
+    while IFS= read -r f; do SORTED+=("$f"); done < <(printf '%s\n' "${ROTATED[@]}" | sort -t. -k2,2nr)
+    grep -EH -- "$GREP_PATTERN" "${SORTED[@]}" "$LOG_FILE" 2>/dev/null || true
+  else
+    grep -EH -- "$GREP_PATTERN" "$LOG_FILE" 2>/dev/null || true
+  fi
+  exit 0
+fi
+
+if [ "$INCLUDE_ROTATED" = "1" ]; then
+  shopt -s nullglob
+  ROTATED=( "$LOG_FILE".[0-9]* )
+  shopt -u nullglob
+  if [ "${#ROTATED[@]}" -gt 0 ]; then
+    SORTED=()
+    while IFS= read -r f; do SORTED+=("$f"); done < <(printf '%s\n' "${ROTATED[@]}" | sort -t. -k2,2nr)
+    # Concatenate oldest-rotated -> newest-rotated -> active, then follow.
+    tail -n +1 "${SORTED[@]}" "$LOG_FILE" 2>/dev/null
+    exec tail -F "$LOG_FILE"
+  fi
+fi
+
+exec tail -F "$LOG_FILE"
