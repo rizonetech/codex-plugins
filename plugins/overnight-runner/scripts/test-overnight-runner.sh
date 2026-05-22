@@ -31,7 +31,6 @@ git commit -q -m "seed test repo"
 python3 "$RUNNER" start todo/ui.md >/tmp/overnight-start.out
 python3 "$RUNNER" update \
   --slice "Admin settings CRUD" \
-  --gate implemented_review=passed \
   --gate implemented=passed \
   --gate automated_tests=passed \
   --gate feature_gate=passed \
@@ -63,6 +62,14 @@ python3 "$RUNNER" update \
   --workflow-viewport 1440x1000 \
   >/tmp/overnight-update.out
 
+python3 "$RUNNER" checked-review \
+  --line 3 \
+  --status missing-added \
+  --evidence "Verified skeleton exists in current code; ARIA polish remains separate." \
+  --missing "Add ARIA label to existing UI skeleton" \
+  --add-missing \
+  >/tmp/overnight-checked-review.out
+grep -q "Missing from completed claim: Add ARIA label to existing UI skeleton" todo/ui.md
 python3 "$RUNNER" finish-check --allow-blocked >/tmp/overnight-finish.out
 python3 "$RUNNER" handoff --write-todo >/tmp/overnight-handoff.out
 grep -q "## Run Handoff" todo/ui.md

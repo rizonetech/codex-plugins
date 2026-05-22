@@ -81,12 +81,52 @@ Work through all unblocked todo slices. Stop only for:
 Do not final-answer just because one slice is done. Reread the todo file, update
 the state, and continue to the next actionable item.
 
+## Checked Item Review
+
+Treat every existing `[x]` item as a claim, not as truth. At the start of a run
+and whenever you reread the todo, quickly verify each checked claim against the
+current codebase, tests, browser evidence, docs, commits, or deploy state that
+would actually prove it. The pass should be fast, but it must be real:
+
+- read the touched files or current implementation, not only old notes
+- run or inspect the smallest meaningful command/evidence for the claim
+- confirm browser/UI/deploy claims with ChromeMCP evidence when relevant
+- check that the claim still matches the current code after any recent changes
+
+Record each checked claim with the guard:
+
+```bash
+"${OR[@]}" checked-review \
+  --line 12 \
+  --status passed \
+  --evidence "tests/Feature/LoginTest.php covers password reset" \
+  --command "php artisan test tests/Feature/LoginTest.php"
+```
+
+If a checked claim is partly true but missing work, add the missing work back to
+the todo as unchecked children and record the review as `missing-added`:
+
+```bash
+"${OR[@]}" checked-review \
+  --line 12 \
+  --status missing-added \
+  --evidence "Login form exists and authenticates" \
+  --missing "Add password reset browser coverage" \
+  --add-missing
+```
+
+Use `failed` only when the claim should no longer be trusted and needs direct
+correction before completion. Use `blocked` only when the verification itself is
+blocked by a concrete environment, data, decision, or automation issue. Do not
+mark `implemented_review=passed` manually; let the per-item review ledger move
+that gate once every current checked claim is `passed` or `missing-added`.
+
 ## Slice Loop
 
 For every slice:
 
 1. Reconcile the todo with the current codebase and mark stale checked items only
-   after reviewing actual implementation evidence.
+   after reviewing actual implementation evidence with `checked-review`.
 2. Classify the slice: `code`, `ui`, `docs-research`, `infra`, `deploy`,
    `cleanup-reset`, `legal-provenance`, or `evidence-note`.
 3. Implement a vertical slice with the smallest safe blast radius.

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -244,11 +245,37 @@ def resolve_todo(root: Path, todo_file: str | None) -> Path | None:
     return candidate if candidate.is_absolute() else root / candidate
 
 
-def relative_to_root(root: Path, path: Path) -> str:
-    try:
-        return str(path.relative_to(root))
-    except ValueError:
-        return str(path)
+def todo_claim_text(line: str) -> str:
+    return re.sub(r"^\s*[-*]\s+\[[xX ]\]\s*", "", line).strip()
+
+
+def claim_id(text: str) -> str:
+    normalized = re.sub(r"\s+", " ", text.strip().lower())
+    return hashlib.sha1(normalized.encode("utf-8")).hexdigest()[:12]
+
+
+def todo_line_indent(line: str) -> str:
+    match = re.match(r"^(\s*)", line)
+    return match.group(1) if match else ""
+
+
+def parse_todo_items(root: Path, todo_file: str | None) -> dict[str, list[dict[str, Any]]]:
+    todo_path = resolve_todo(root, todo_file)
+    if not todo_path or not todo_path.exists():
+        raise SystemExit(f"Todo file not found: {todo_file}")
+    checked = []
+    unchecked = []
+    blockers = []
+    for index, line in enumerate(todo_path.read_text(encoding="utf-8").splitlines(), 1):
+        if re.search(r"^\s*[-*]\s+\[[xX]\]\s+", line):
+            text = todo_claim_text(line)
+            checked.append({"line": index, "text": line.strip(), "claim": text, "claim_id": claim_id(text)})
+        elif re.search(r"^\s*[-*]\s+\[\s\]\s+", line):
+            text = todo_claim_text(line)
+            unchecked.append({"line": index, "text": line.strip(), "claim": text, "claim_id": claim_id(text)})
+        if re.search(r"\b(Blocked|Deferred):", line):
+            blockers.append({"line": index, "text": line.strip()})
+    return {"checked": checked, "unchecked": unchecked, "blockers": blockers}
 
 
 def pattern_matches(text: str, patterns: tuple[str, ...]) -> bool:
@@ -546,6 +573,7 @@ def build_preflight(root: Path, todo_file: str | None) -> dict[str, Any]:
     if todo_file and (todo_path is None or not todo_path.exists()):
         raise SystemExit(f"Todo file not found: {todo_file}")
     text = todo_path.read_text(encoding="utf-8") if todo_path and todo_path.exists() else ""
+    todo_items = parse_todo_items(root, todo_file) if todo_file else {"checked": [], "unchecked": [], "blockers": []}
     classification = classify_text(text)
     modules = detect_modules(root)
     module_checks = module_preflight_checks(root, modules, classification["classifications"])
@@ -561,6 +589,11 @@ def build_preflight(root: Path, todo_file: str | None) -> dict[str, Any]:
         "captured_at": now(),
         "todo_file": todo_file,
         "todo_file_exists": bool(todo_path and todo_path.exists()),
+        "todo_items": {
+            "checked_count": len(todo_items["checked"]),
+            "unchecked_count": len(todo_items["unchecked"]),
+            "checked": todo_items["checked"],
+        },
         "git": git_snapshot(root),
         "modules": modules,
         "module_checks": module_checks,
@@ -568,6 +601,7 @@ def build_preflight(root: Path, todo_file: str | None) -> dict[str, Any]:
         "chromemcp": chrome,
         "notes": [
             "Project modules are detected from repository markers. Apply only the module rules that match this repository.",
+            "Every checked todo item must be verified against current code/evidence before trusting it.",
             "ChromeMCP is preferred for user-facing verification.",
             "If ChromeMCP is blocked, browser/UI completion gates must remain blocked until real evidence is captured.",
         ],
@@ -593,6 +627,20 @@ def command_start(args: argparse.Namespace) -> None:
         "completed_slices": [],
         "blockers": [],
         "artifacts": [],
+        "checked_item_review": {
+            "status": "pending" if preflight["todo_items"]["checked_count"] else "not-applicable",
+            "items": {
+                item["claim_id"]: {
+                    "line": item["line"],
+                    "claim": item["claim"],
+                    "status": "pending",
+                    "evidence": [],
+                    "missing_items": [],
+                    "updated_at": None,
+                }
+                for item in preflight["todo_items"]["checked"]
+            },
+        },
         "chromemcp_failures": {},
         "chromemcp": {
             "required_for_user_facing": True,
@@ -838,27 +886,98 @@ def command_status(_: argparse.Namespace) -> None:
     print(json.dumps(state, indent=2, sort_keys=True))
 
 
-def todo_unchecked_and_blocked(root: Path, todo_file: str | None, limit: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+def append_missing_items_to_todo(root: Path, todo_file: str, line_number: int, missing_items: list[str]) -> None:
     todo_path = resolve_todo(root, todo_file)
     if not todo_path or not todo_path.exists():
         raise SystemExit(f"Todo file not found: {todo_file}")
     lines = todo_path.read_text(encoding="utf-8").splitlines()
-    unchecked = [
-        {"line": index, "text": line.strip()}
-        for index, line in enumerate(lines, 1)
-        if re.search(r"^\s*[-*]\s+\[\s\]\s+", line)
+    if line_number < 1 or line_number > len(lines):
+        raise SystemExit(f"Todo line does not exist: {line_number}")
+    parent = lines[line_number - 1]
+    indent = todo_line_indent(parent) + "  "
+    existing = set(lines)
+    additions = []
+    for item in missing_items:
+        text = item.strip()
+        if not text:
+            continue
+        addition = f"{indent}- [ ] Missing from completed claim: {text}"
+        if addition not in existing:
+            additions.append(addition)
+            existing.add(addition)
+    if not additions:
+        return
+    lines[line_number:line_number] = additions
+    todo_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
+def command_checked_review(args: argparse.Namespace) -> None:
+    root = repo_root()
+    state = ensure_state(root)
+    todo_file = args.todo_file or state.get("todo_file")
+    if not todo_file:
+        raise SystemExit("No todo file supplied and no active run todo_file found.")
+    items = parse_todo_items(root, todo_file)["checked"]
+    item = next((candidate for candidate in items if candidate["line"] == args.line), None)
+    if item is None:
+        raise SystemExit(f"No checked todo item found at line {args.line}.")
+    if args.status == "missing-added" and not args.missing:
+        raise SystemExit("--status missing-added requires at least one --missing item.")
+    if args.add_missing and args.missing:
+        append_missing_items_to_todo(root, todo_file, args.line, args.missing)
+    review = state.setdefault("checked_item_review", {"status": "pending", "items": {}})
+    reviewed = review.setdefault("items", {}).setdefault(
+        item["claim_id"],
+        {
+            "line": item["line"],
+            "claim": item["claim"],
+            "status": "pending",
+            "evidence": [],
+            "missing_items": [],
+            "updated_at": None,
+        },
+    )
+    reviewed["line"] = item["line"]
+    reviewed["claim"] = item["claim"]
+    reviewed["status"] = args.status
+    reviewed["updated_at"] = now()
+    if args.evidence or args.note:
+        reviewed.setdefault("evidence", []).append(
+            {
+                "at": now(),
+                "note": args.note,
+                "evidence": args.evidence or [],
+                "command": args.command,
+            }
+        )
+    append_unique(reviewed.setdefault("missing_items", []), args.missing)
+    current_ids = {candidate["claim_id"] for candidate in items}
+    statuses = [
+        entry.get("status", "pending")
+        for claim, entry in review.get("items", {}).items()
+        if claim in current_ids
     ]
-    checked = [
-        {"line": index, "text": line.strip()}
-        for index, line in enumerate(lines, 1)
-        if re.search(r"^\s*[-*]\s+\[[xX]\]\s+", line)
-    ]
-    blockers = [
-        {"line": index, "text": line.strip()}
-        for index, line in enumerate(lines, 1)
-        if re.search(r"\b(Blocked|Deferred):", line)
-    ]
-    return checked[:limit], unchecked[:limit], blockers[:limit]
+    if not current_ids:
+        review["status"] = "not-applicable"
+    elif statuses and all(status in {"passed", "missing-added"} for status in statuses) and len(statuses) == len(current_ids):
+        review["status"] = "passed"
+        update_gate(state, "implemented_review=passed", "All checked todo claims reviewed.")
+    elif any(status == "failed" for status in statuses):
+        review["status"] = "failed"
+        update_gate(state, "implemented_review=failed", "At least one checked todo claim failed verification.")
+    elif any(status == "blocked" for status in statuses):
+        review["status"] = "blocked"
+        update_gate(state, "implemented_review=blocked", "At least one checked todo claim is blocked.")
+    else:
+        review["status"] = "pending"
+    state["updated_at"] = now()
+    write_state(root, state)
+    print(f"Reviewed checked todo line {args.line}: {args.status}")
+
+
+def todo_unchecked_and_blocked(root: Path, todo_file: str | None, limit: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    items = parse_todo_items(root, todo_file)
+    return items["checked"][:limit], items["unchecked"][:limit], items["blockers"][:limit]
 
 
 def existing_artifact_errors(root: Path, label: str, paths: list[str] | None, *, min_bytes: int = 1) -> list[str]:
@@ -877,6 +996,24 @@ def existing_artifact_errors(root: Path, label: str, paths: list[str] | None, *,
 
 def finish_errors(root: Path, state: dict[str, Any], *, allow_blocked: bool) -> list[str]:
     errors = []
+    todo_file = state.get("todo_file")
+    current_checked = parse_todo_items(root, todo_file)["checked"] if todo_file else []
+    review = state.get("checked_item_review") or {}
+    reviewed_items = review.get("items") or {}
+    for item in current_checked:
+        entry = reviewed_items.get(item["claim_id"])
+        if not entry:
+            errors.append(f"checked todo line {item['line']} has not been verified: {item['claim']}")
+            continue
+        status = entry.get("status", "pending")
+        if status in {"passed", "missing-added"}:
+            if status == "missing-added" and not entry.get("missing_items"):
+                errors.append(f"checked todo line {item['line']} is missing-added but has no missing_items recorded")
+            continue
+        if status == "blocked" and allow_blocked:
+            continue
+        errors.append(f"checked todo line {item['line']} verification is {status}: {item['claim']}")
+
     for name, gate in (state.get("gates") or {}).items():
         if not gate.get("required"):
             continue
@@ -1105,6 +1242,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     status = sub.add_parser("status", help="Print current state.")
     status.set_defaults(func=command_status)
+
+    checked_review = sub.add_parser("checked-review", help="Record verification for an existing checked todo item.")
+    checked_review.add_argument("--todo-file")
+    checked_review.add_argument("--line", type=int, required=True, help="1-based line number of the checked todo item.")
+    checked_review.add_argument(
+        "--status",
+        required=True,
+        choices=["passed", "missing-added", "failed", "blocked"],
+        help="Verification result for the completed claim.",
+    )
+    checked_review.add_argument("--evidence", action="append", help="Current code, command, URL, artifact, or note proving the claim.")
+    checked_review.add_argument("--missing", action="append", help="Missing work discovered while verifying this completed claim.")
+    checked_review.add_argument("--add-missing", action="store_true", help="Append --missing items as unchecked todo children.")
+    checked_review.add_argument("--command", help="Verification command used for this claim.")
+    checked_review.add_argument("--note", help="Short verification note.")
+    checked_review.set_defaults(func=command_checked_review)
 
     finish = sub.add_parser("finish-check", help="Check whether the run can final-answer.")
     finish.add_argument("--todo-file")
