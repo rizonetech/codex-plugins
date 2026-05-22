@@ -12,8 +12,9 @@ The plugin writes state to the active repository:
 Existing checked todo items are treated as claims. The runner requires each
 current `[x]` item to be reviewed with current evidence before finish-check can
 pass. If a checked item is partly true but missing work, use
-`checked-review --status missing-added --missing ... --add-missing` to append the
-missing work back into the todo as unchecked follow-up items.
+`checked-review --status remediated --missing ... --add-missing` after fixing
+the gap. The runner appends the remediated work back into the todo as checked
+history so completion remains accurate without creating work to rediscover.
 
 ChromeMCP is strongly preferred for user-facing verification. If ChromeMCP is
 not installed, enabled, or running, the guard records a blocker and keeps the

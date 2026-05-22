@@ -886,7 +886,14 @@ def command_status(_: argparse.Namespace) -> None:
     print(json.dumps(state, indent=2, sort_keys=True))
 
 
-def append_missing_items_to_todo(root: Path, todo_file: str, line_number: int, missing_items: list[str]) -> None:
+def append_missing_items_to_todo(
+    root: Path,
+    todo_file: str,
+    line_number: int,
+    missing_items: list[str],
+    *,
+    completed: bool = False,
+) -> list[dict[str, Any]]:
     todo_path = resolve_todo(root, todo_file)
     if not todo_path or not todo_path.exists():
         raise SystemExit(f"Todo file not found: {todo_file}")
@@ -897,18 +904,24 @@ def append_missing_items_to_todo(root: Path, todo_file: str, line_number: int, m
     indent = todo_line_indent(parent) + "  "
     existing = set(lines)
     additions = []
+    added_claims = []
     for item in missing_items:
         text = item.strip()
         if not text:
             continue
-        addition = f"{indent}- [ ] Missing from completed claim: {text}"
+        marker = "x" if completed else " "
+        prefix = "Remediated gap from completed claim" if completed else "Missing from completed claim"
+        claim = f"{prefix}: {text}"
+        addition = f"{indent}- [{marker}] {claim}"
         if addition not in existing:
             additions.append(addition)
             existing.add(addition)
+            added_claims.append({"claim": claim, "claim_id": claim_id(claim)})
     if not additions:
-        return
+        return []
     lines[line_number:line_number] = additions
     todo_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return added_claims
 
 
 def command_checked_review(args: argparse.Namespace) -> None:
@@ -921,10 +934,19 @@ def command_checked_review(args: argparse.Namespace) -> None:
     item = next((candidate for candidate in items if candidate["line"] == args.line), None)
     if item is None:
         raise SystemExit(f"No checked todo item found at line {args.line}.")
-    if args.status == "missing-added" and not args.missing:
-        raise SystemExit("--status missing-added requires at least one --missing item.")
+    if args.status in {"missing-added", "remediated"} and not args.missing:
+        raise SystemExit(f"--status {args.status} requires at least one --missing item.")
+    if args.status == "remediated" and not (args.evidence or args.note or args.command):
+        raise SystemExit("--status remediated requires --evidence, --note, or --command proving the gap was implemented.")
+    added_claims: list[dict[str, Any]] = []
     if args.add_missing and args.missing:
-        append_missing_items_to_todo(root, todo_file, args.line, args.missing)
+        added_claims = append_missing_items_to_todo(
+            root,
+            todo_file,
+            args.line,
+            args.missing,
+            completed=args.status == "remediated",
+        )
     review = state.setdefault("checked_item_review", {"status": "pending", "items": {}})
     reviewed = review.setdefault("items", {}).setdefault(
         item["claim_id"],
@@ -951,7 +973,27 @@ def command_checked_review(args: argparse.Namespace) -> None:
             }
         )
     append_unique(reviewed.setdefault("missing_items", []), args.missing)
-    current_ids = {candidate["claim_id"] for candidate in items}
+    if args.status == "remediated":
+        reviewed["remediated_at"] = now()
+        reviewed["remediation_note"] = "Missing work was implemented before this checked claim was accepted."
+        for added in added_claims:
+            review.setdefault("items", {})[added["claim_id"]] = {
+                "line": None,
+                "claim": added["claim"],
+                "status": "passed",
+                "evidence": [
+                    {
+                        "at": now(),
+                        "note": args.note or "Remediated as part of parent checked-claim verification.",
+                        "evidence": args.evidence or [],
+                        "command": args.command,
+                    }
+                ],
+                "missing_items": [],
+                "updated_at": now(),
+                "parent_claim_id": item["claim_id"],
+            }
+    current_ids = {candidate["claim_id"] for candidate in parse_todo_items(root, todo_file)["checked"]}
     statuses = [
         entry.get("status", "pending")
         for claim, entry in review.get("items", {}).items()
@@ -959,9 +1001,9 @@ def command_checked_review(args: argparse.Namespace) -> None:
     ]
     if not current_ids:
         review["status"] = "not-applicable"
-    elif statuses and all(status in {"passed", "missing-added"} for status in statuses) and len(statuses) == len(current_ids):
+    elif statuses and all(status in {"passed", "remediated"} for status in statuses) and len(statuses) == len(current_ids):
         review["status"] = "passed"
-        update_gate(state, "implemented_review=passed", "All checked todo claims reviewed.")
+        update_gate(state, "implemented_review=passed", "All checked todo claims reviewed and any discovered gaps remediated.")
     elif any(status == "failed" for status in statuses):
         review["status"] = "failed"
         update_gate(state, "implemented_review=failed", "At least one checked todo claim failed verification.")
@@ -1006,9 +1048,14 @@ def finish_errors(root: Path, state: dict[str, Any], *, allow_blocked: bool) -> 
             errors.append(f"checked todo line {item['line']} has not been verified: {item['claim']}")
             continue
         status = entry.get("status", "pending")
-        if status in {"passed", "missing-added"}:
-            if status == "missing-added" and not entry.get("missing_items"):
-                errors.append(f"checked todo line {item['line']} is missing-added but has no missing_items recorded")
+        if status in {"passed", "remediated"}:
+            if status == "remediated" and not entry.get("missing_items"):
+                errors.append(f"checked todo line {item['line']} is remediated but has no missing_items recorded")
+            continue
+        if status == "missing-added":
+            errors.append(
+                f"checked todo line {item['line']} has gaps added but not remediated: {item['claim']}"
+            )
             continue
         if status == "blocked" and allow_blocked:
             continue
@@ -1249,12 +1296,16 @@ def build_parser() -> argparse.ArgumentParser:
     checked_review.add_argument(
         "--status",
         required=True,
-        choices=["passed", "missing-added", "failed", "blocked"],
+        choices=["passed", "missing-added", "remediated", "failed", "blocked"],
         help="Verification result for the completed claim.",
     )
     checked_review.add_argument("--evidence", action="append", help="Current code, command, URL, artifact, or note proving the claim.")
     checked_review.add_argument("--missing", action="append", help="Missing work discovered while verifying this completed claim.")
-    checked_review.add_argument("--add-missing", action="store_true", help="Append --missing items as unchecked todo children.")
+    checked_review.add_argument(
+        "--add-missing",
+        action="store_true",
+        help="Append --missing items to the todo. With --status remediated they are added as checked remediation items.",
+    )
     checked_review.add_argument("--command", help="Verification command used for this claim.")
     checked_review.add_argument("--note", help="Short verification note.")
     checked_review.set_defaults(func=command_checked_review)

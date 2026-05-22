@@ -104,22 +104,28 @@ Record each checked claim with the guard:
 ```
 
 If a checked claim is partly true but missing work, add the missing work back to
-the todo as unchecked children and record the review as `missing-added`:
+the todo and implement it immediately. Record the review as `remediated` only
+after the gap is fixed and evidenced:
 
 ```bash
 "${OR[@]}" checked-review \
   --line 12 \
-  --status missing-added \
-  --evidence "Login form exists and authenticates" \
+  --status remediated \
+  --evidence "Login form exists, authenticates, and password reset browser coverage now passes" \
   --missing "Add password reset browser coverage" \
   --add-missing
 ```
+
+`remediated` adds the missing work back as a checked remediation item, so the
+todo history remains accurate without creating work that must be rediscovered
+later. Use `missing-added` only as a temporary state while you are actively
+implementing the gap in the same run; it cannot pass `finish-check`.
 
 Use `failed` only when the claim should no longer be trusted and needs direct
 correction before completion. Use `blocked` only when the verification itself is
 blocked by a concrete environment, data, decision, or automation issue. Do not
 mark `implemented_review=passed` manually; let the per-item review ledger move
-that gate once every current checked claim is `passed` or `missing-added`.
+that gate once every current checked claim is `passed` or `remediated`.
 
 ## Slice Loop
 

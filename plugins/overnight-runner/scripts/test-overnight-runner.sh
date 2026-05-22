@@ -64,12 +64,12 @@ python3 "$RUNNER" update \
 
 python3 "$RUNNER" checked-review \
   --line 3 \
-  --status missing-added \
-  --evidence "Verified skeleton exists in current code; ARIA polish remains separate." \
+  --status remediated \
+  --evidence "Verified skeleton exists in current code and ARIA label was added before accepting the claim." \
   --missing "Add ARIA label to existing UI skeleton" \
   --add-missing \
   >/tmp/overnight-checked-review.out
-grep -q "Missing from completed claim: Add ARIA label to existing UI skeleton" todo/ui.md
+grep -q "\\[x\\] Remediated gap from completed claim: Add ARIA label to existing UI skeleton" todo/ui.md
 python3 "$RUNNER" finish-check --allow-blocked >/tmp/overnight-finish.out
 python3 "$RUNNER" handoff --write-todo >/tmp/overnight-handoff.out
 grep -q "## Run Handoff" todo/ui.md
