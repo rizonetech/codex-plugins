@@ -38,6 +38,7 @@ Claude review is opportunistic external signal, not a hard runtime dependency.
 - Do not treat Claude questions as findings. Skip over them and proceed with the available repository evidence.
 - If Claude returns partial findings before failing or asking a question, verify the concrete findings it already provided and ignore the interactive/question part.
 - Keep the skip note brief; the goal is to preserve flow, not make the user manage the review failure.
+- A local shell quoting failure before Claude starts is not an acceptable Claude skip. Correct the invocation and retry with the prompt-file pattern below.
 
 ## Prepare The Claude Review
 
@@ -54,13 +55,35 @@ If the review targets a commit, branch, or PR, inspect that comparison instead o
 
 When code has already been committed, compare the implementation against its base branch or parent commit. When the base is unclear, state the assumption and use the most defensible local comparison.
 
-If the `claude` CLI is available, run Claude Code non-interactively from the repository root. Use a prompt shaped like this:
+If the `claude` CLI is available, run Claude Code non-interactively from the repository root. Do not inline the review prompt inside a shell command. Write the prompt to a temporary file, then feed it to Claude through stdin:
 
 ```bash
-claude -p '<prompt>'
+prompt_file="$(mktemp -t claude-adversarial-review.XXXXXX.md)"
+output_file="$(mktemp -t claude-adversarial-review-output.XXXXXX.md)"
+cat > "$prompt_file" <<'CLAUDE_REVIEW_PROMPT'
+[review-kind: adversarial]
+
+You are reviewing Codex changes as an external adversarial reviewer.
+
+Scope:
+- Review only the provided diff/TODO/commit scope unless a changed contract creates wider risk.
+- Look for real bugs, regressions, security issues, missing rollback/error handling, concurrency problems, broken wiring, data loss, and insufficient tests.
+- Do not give style-only feedback unless it hides a defect.
+- Every finding must include severity, file:line, evidence, impact, and a concrete fix or rejection test.
+- If no actionable issues exist, say so directly and list residual risks separately.
+- Do not ask questions. If context is missing, state the assumption or residual risk and continue.
+
+Review target:
+<describe diff, commit range, TODO section, or PR>
+CLAUDE_REVIEW_PROMPT
+
+timeout 120s claude --tools "" -p < "$prompt_file" > "$output_file"
+cat "$output_file"
 ```
 
-Prompt Claude with:
+This prompt-file pattern is mandatory because it avoids PowerShell, Bash, and nested here-document interpolation problems. If it fails before Claude starts, fix the local command and retry once before recording a skip.
+
+Use this prompt shape:
 
 ```text
 [review-kind: adversarial]

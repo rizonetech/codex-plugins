@@ -8,6 +8,10 @@ The Claude review step is fail-soft. If Claude Code is unavailable, rate-limited
 unauthenticated, asks a question, or needs interaction, Codex records
 `Claude review: skipped (<reason>)` and continues the normal Codex flow.
 
+Claude prompts should be written to a temporary file and passed through stdin
+instead of embedded directly in shell arguments. This avoids PowerShell/Bash
+quoting failures before Claude Code starts.
+
 ## Install
 
 Install through the repository-level installer:
