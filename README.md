@@ -9,6 +9,7 @@ This repository contains the plugin payloads and installer needed to develop and
 - [ChromeMCP](plugins/chromemcp-browser)
 - [Bashlane](plugins/bashlane)
 - [Overnight Runner](plugins/overnight-runner)
+- [Claude Code Adversarial Review](plugins/claude-code-adversarial-review)
 
 ## Requirements
 
@@ -37,6 +38,7 @@ The installer creates:
   plugins/chromemcp-browser/
   plugins/bashlane/
   plugins/overnight-runner/
+  plugins/claude-code-adversarial-review/
 ~/.codex/tools/
   chromemcp-run
   overnight-runner
@@ -53,9 +55,12 @@ enabled = true
 
 [plugins."overnight-runner@rizonetech-local"]
 enabled = true
+
+[plugins."claude-code-adversarial-review@rizonetech-local"]
+enabled = true
 ```
 
-Both plugins are grouped under the `Rizonetech` category.
+All plugins are grouped under the `Rizonetech` category.
 
 Restart Codex after installation so it reloads the local marketplace and MCP
 definitions.
@@ -116,6 +121,21 @@ ChromeMCP blocker and still allows non-browser work to continue when safe. UI,
 visual, CRUD/GRUD, and production smoke items must stay incomplete until real
 ChromeMCP evidence is captured.
 
+## Claude Code Adversarial Review
+
+Use this plugin when Claude Code has implemented a task, produced a diff, or
+completed a TODO section and Codex should review it as an external adversarial
+reviewer.
+
+```text
+Use Claude Code Adversarial Review on this diff
+Review Claude Code's changes for bugs and regressions
+Run an adversarial review of this TODO section
+```
+
+The skill requires file and line evidence for findings, rejects unverified
+suspicions, and blocks completion on unresolved Critical or High issues.
+
 ## Layout
 
 ```text
@@ -123,6 +143,7 @@ plugins/
   chromemcp-browser/  # Codex plugin plus ChromeMCP MCP server/runtime
   bashlane/           # Codex plugin plus wsl-run installer/helper
   overnight-runner/   # Codex plugin plus long todo guard/helper
+  claude-code-adversarial-review/  # Codex review skill for Claude Code output
 scripts/
   install-rizonetech-local.ps1
 ```

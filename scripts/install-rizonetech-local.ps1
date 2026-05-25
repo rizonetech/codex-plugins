@@ -59,7 +59,27 @@ function Remove-DirectoryInside {
     throw "Refusing to remove path outside expected root: $resolvedTarget"
   }
 
-  Remove-Item -Recurse -Force -LiteralPath $resolvedTarget
+  try {
+    Remove-Item -Recurse -Force -LiteralPath $resolvedTarget -ErrorAction Stop
+  } catch {
+    $isWslTarget = $resolvedTarget.StartsWith("\\wsl.localhost\") -or $resolvedTarget.StartsWith("\\wsl$\")
+    $isWslRoot = $resolvedRoot.StartsWith("\\wsl.localhost\") -or $resolvedRoot.StartsWith("\\wsl$\")
+
+    if (-not ($isWslTarget -and $isWslRoot)) {
+      throw
+    }
+
+    $wslTarget = ConvertTo-WslPath $resolvedTarget
+    $wslRoot = (ConvertTo-WslPath $resolvedRoot).TrimEnd("/")
+    if (-not $wslTarget.StartsWith($wslRoot + "/", [System.StringComparison]::Ordinal)) {
+      throw "Refusing WSL fallback removal outside expected root: $wslTarget"
+    }
+
+    & wsl.exe -- rm -rf -- $wslTarget
+    if ($LASTEXITCODE -ne 0) {
+      throw "WSL fallback removal failed for: $resolvedTarget"
+    }
+  }
 }
 
 function Remove-TomlBlock {
@@ -157,6 +177,11 @@ $plugins = @(
     Name = "overnight-runner"
     Source = Join-Path $SourcePluginsRoot "overnight-runner"
     Requires = @(".codex-plugin\plugin.json", "scripts\overnight-runner.py", "skills\overnight-runner\SKILL.md")
+  },
+  @{
+    Name = "claude-code-adversarial-review"
+    Source = Join-Path $SourcePluginsRoot "claude-code-adversarial-review"
+    Requires = @(".codex-plugin\plugin.json", "skills\claude-code-adversarial-review\SKILL.md")
   }
 )
 
@@ -263,6 +288,18 @@ $marketplace = @{
         authentication = "ON_INSTALL"
       }
       category = "Rizonetech"
+    },
+    @{
+      name = "claude-code-adversarial-review"
+      source = @{
+        source = "local"
+        path = "./plugins/claude-code-adversarial-review"
+      }
+      policy = @{
+        installation = "AVAILABLE"
+        authentication = "ON_INSTALL"
+      }
+      category = "Rizonetech"
     }
   )
 }
@@ -337,7 +374,8 @@ foreach ($header in @(
   'marketplaces.rizonetech-local',
   'plugins."chromemcp-browser@rizonetech-local"',
   'plugins."bashlane@rizonetech-local"',
-  'plugins."overnight-runner@rizonetech-local"'
+  'plugins."overnight-runner@rizonetech-local"',
+  'plugins."claude-code-adversarial-review@rizonetech-local"'
 )) {
   $config = Remove-TomlBlock -Text $config -Header $header
 }
@@ -357,6 +395,9 @@ enabled = true
 enabled = true
 
 [plugins."overnight-runner@rizonetech-local"]
+enabled = true
+
+[plugins."claude-code-adversarial-review@rizonetech-local"]
 enabled = true
 "@
 

@@ -1,0 +1,39 @@
+{
+  "name": "claude-code-adversarial-review",
+  "version": "0.1.0",
+  "description": "Adversarially review Claude Code changes from Codex with evidence-first findings.",
+  "author": {
+    "name": "Rizonetech (Pty) Ltd",
+    "email": "derick@rizonetech.com",
+    "url": "https://rizonetech.com"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "review",
+    "adversarial",
+    "codex",
+    "quality"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Claude Code Adversarial Review",
+    "shortDescription": "Review Claude Code changes as a skeptical external reviewer.",
+    "longDescription": "Claude Code Adversarial Review gives Codex a strict evidence-first review workflow for Claude Code output: inspect the actual diff, verify every finding at file and line level, separate true defects from false positives, and block completion on unresolved high-impact issues.",
+    "developerName": "Rizonetech",
+    "category": "Rizonetech",
+    "capabilities": [
+      "Review",
+      "Quality",
+      "Workflow"
+    ],
+    "defaultPrompt": [
+      "Use Claude Code Adversarial Review on this diff",
+      "Review Claude Code's changes for bugs and regressions",
+      "Run an adversarial review of this TODO section"
+    ],
+    "brandColor": "#7C3AED",
+    "composerIcon": "./.codex-plugin/icon.svg",
+    "logo": "./.codex-plugin/icon.svg"
+  }
+}
