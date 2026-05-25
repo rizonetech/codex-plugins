@@ -177,12 +177,11 @@ $plugins = @(
     Name = "overnight-runner"
     Source = Join-Path $SourcePluginsRoot "overnight-runner"
     Requires = @(".codex-plugin\plugin.json", "scripts\overnight-runner.py", "skills\overnight-runner\SKILL.md")
-  },
-  @{
-    Name = "claude-code-adversarial-review"
-    Source = Join-Path $SourcePluginsRoot "claude-code-adversarial-review"
-    Requires = @(".codex-plugin\plugin.json", "skills\claude-code-adversarial-review\SKILL.md")
   }
+)
+
+$retiredPluginNames = @(
+  "claude-code-adversarial-review"
 )
 
 foreach ($plugin in $plugins) {
@@ -206,6 +205,10 @@ $toolsRoot = Join-Path $CodexPluginHome "tools"
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $marketplacePath) | Out-Null
 New-Item -ItemType Directory -Force -Path $pluginsDestRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $toolsRoot | Out-Null
+
+foreach ($retiredPluginName in $retiredPluginNames) {
+  Remove-DirectoryInside -Target (Join-Path $pluginsDestRoot $retiredPluginName) -Root $pluginsDestRoot
+}
 
 foreach ($plugin in $plugins) {
   $dest = Join-Path $pluginsDestRoot $plugin.Name
@@ -282,18 +285,6 @@ $marketplace = @{
       source = @{
         source = "local"
         path = "./plugins/overnight-runner"
-      }
-      policy = @{
-        installation = "AVAILABLE"
-        authentication = "ON_INSTALL"
-      }
-      category = "Rizonetech"
-    },
-    @{
-      name = "claude-code-adversarial-review"
-      source = @{
-        source = "local"
-        path = "./plugins/claude-code-adversarial-review"
       }
       policy = @{
         installation = "AVAILABLE"
@@ -395,9 +386,6 @@ enabled = true
 enabled = true
 
 [plugins."overnight-runner@rizonetech-local"]
-enabled = true
-
-[plugins."claude-code-adversarial-review@rizonetech-local"]
 enabled = true
 "@
 

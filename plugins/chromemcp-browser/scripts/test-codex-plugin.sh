@@ -15,6 +15,10 @@ assert_file() {
   [ -f "$1" ] || fail "expected file: $1"
 }
 
+assert_not_exists() {
+  [ ! -e "$1" ] || fail "did not expect path: $1"
+}
+
 assert_contains() {
   local needle="$1"
   local file="$2"
@@ -42,9 +46,6 @@ for rel in [
     "plugins/overnight-runner/.codex-plugin/plugin.json",
     "plugins/overnight-runner/scripts/overnight-runner.py",
     "plugins/overnight-runner/skills/overnight-runner/SKILL.md",
-    "plugins/claude-code-adversarial-review/.codex-plugin/plugin.json",
-    "plugins/claude-code-adversarial-review/.codex-plugin/icon.svg",
-    "plugins/claude-code-adversarial-review/skills/claude-code-adversarial-review/SKILL.md",
 ]:
     path = root / rel
     if rel.endswith(".json"):
@@ -62,7 +63,6 @@ plugins = {p["name"]: p for p in marketplace["plugins"]}
 assert plugins["chromemcp-browser"]["source"]["path"] == "./plugins/chromemcp-browser"
 assert plugins["bashlane"]["source"]["path"] == "./plugins/bashlane"
 assert plugins["overnight-runner"]["source"]["path"] == "./plugins/overnight-runner"
-assert plugins["claude-code-adversarial-review"]["source"]["path"] == "./plugins/claude-code-adversarial-review"
 
 mcp = json.loads((root / "plugins/chromemcp-browser/.mcp.json").read_text())
 server = mcp["mcpServers"]["chromemcp-playwright"]
@@ -99,7 +99,13 @@ source = '\\?\UNC\wsl.localhost\Ubuntu\old\ChromeMCP'
 
 [plugins."chromemcp-browser@chromemcp-local"]
 enabled = false
+
+[plugins."claude-code-adversarial-review@rizonetech-local"]
+enabled = true
 EOF
+
+mkdir -p "$plugin_home/plugins/rizonetech-local/plugins/claude-code-adversarial-review"
+touch "$plugin_home/plugins/rizonetech-local/plugins/claude-code-adversarial-review/stale.txt"
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "$REPO_ROOT/scripts/install-rizonetech-local.ps1")" \
   -CodexConfigHome "$config_home_win" \
@@ -119,9 +125,7 @@ assert_file "$installed_plugin/.codex-plugin/icon.svg"
 assert_file "$install_root/plugins/bashlane/.codex-plugin/plugin.json"
 assert_file "$install_root/plugins/overnight-runner/.codex-plugin/plugin.json"
 assert_file "$install_root/plugins/overnight-runner/scripts/overnight-runner.py"
-assert_file "$install_root/plugins/claude-code-adversarial-review/.codex-plugin/plugin.json"
-assert_file "$install_root/plugins/claude-code-adversarial-review/.codex-plugin/icon.svg"
-assert_file "$install_root/plugins/claude-code-adversarial-review/skills/claude-code-adversarial-review/SKILL.md"
+assert_not_exists "$install_root/plugins/claude-code-adversarial-review"
 assert_file "$plugin_home/tools/overnight-runner"
 assert_file "$plugin_home/tools/chromemcp-run"
 assert_file "$installed_mcp"
@@ -133,8 +137,8 @@ assert_contains "[marketplaces.rizonetech-local]" "$config"
 assert_contains "[plugins.\"chromemcp-browser@rizonetech-local\"]" "$config"
 assert_contains "[plugins.\"bashlane@rizonetech-local\"]" "$config"
 assert_contains "[plugins.\"overnight-runner@rizonetech-local\"]" "$config"
-assert_contains "[plugins.\"claude-code-adversarial-review@rizonetech-local\"]" "$config"
 assert_contains "enabled = true" "$config"
+assert_not_contains "claude-code-adversarial-review" "$config"
 assert_contains "model = \"gpt-5.5\"" "$config"
 assert_not_contains "chromemcp-local" "$config"
 assert_not_contains "\\old\\ChromeMCP" "$config"
@@ -157,13 +161,11 @@ install_root = Path(sys.argv[1])
 installed_mcp = Path(sys.argv[2])
 marketplace = json.loads((install_root / ".agents/plugins/marketplace.json").read_text())
 plugins = {p["name"]: p for p in marketplace["plugins"]}
-assert set(plugins) == {"chromemcp-browser", "bashlane", "overnight-runner", "claude-code-adversarial-review"}
+assert set(plugins) == {"chromemcp-browser", "bashlane", "overnight-runner"}
 manifest = json.loads((install_root / "plugins/chromemcp-browser/.codex-plugin/plugin.json").read_text())
 assert manifest["interface"]["category"] == "Rizonetech"
 overnight = json.loads((install_root / "plugins/overnight-runner/.codex-plugin/plugin.json").read_text())
 assert overnight["interface"]["category"] == "Rizonetech"
-review = json.loads((install_root / "plugins/claude-code-adversarial-review/.codex-plugin/plugin.json").read_text())
-assert review["interface"]["category"] == "Rizonetech"
 server = json.loads(installed_mcp.read_text())["mcpServers"]["chromemcp-playwright"]
 assert server["headers"]["Authorization"].startswith("Bearer ")
 PY

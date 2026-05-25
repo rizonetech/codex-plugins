@@ -9,7 +9,6 @@ This repository contains the plugin payloads and installer needed to develop and
 - [ChromeMCP](plugins/chromemcp-browser)
 - [Bashlane](plugins/bashlane)
 - [Overnight Runner](plugins/overnight-runner)
-- [Claude Code Adversarial Review](plugins/claude-code-adversarial-review)
 
 ## Requirements
 
@@ -38,7 +37,6 @@ The installer creates:
   plugins/chromemcp-browser/
   plugins/bashlane/
   plugins/overnight-runner/
-  plugins/claude-code-adversarial-review/
 ~/.codex/tools/
   chromemcp-run
   overnight-runner
@@ -54,9 +52,6 @@ enabled = true
 enabled = true
 
 [plugins."overnight-runner@rizonetech-local"]
-enabled = true
-
-[plugins."claude-code-adversarial-review@rizonetech-local"]
 enabled = true
 ```
 
@@ -121,25 +116,6 @@ ChromeMCP blocker and still allows non-browser work to continue when safe. UI,
 visual, CRUD/GRUD, and production smoke items must stay incomplete until real
 ChromeMCP evidence is captured.
 
-## Claude Code Adversarial Review
-
-Use this plugin when Codex has implemented a task, produced a diff, or completed
-a TODO section and Claude Code should review it as an external adversarial
-reviewer. Codex then verifies each Claude finding before fixing, rejecting, or
-accepting it.
-
-```text
-Use Claude Code Adversarial Review on my Codex changes
-Ask Claude Code to review this diff, then verify the findings
-Run Claude Code adversarial review on this TODO section
-```
-
-The skill requires file and line evidence for findings, rejects unverified
-Claude claims, and blocks completion on unresolved Critical or High issues.
-Claude review is fail-soft: if Claude Code is unavailable, rate-limited, asks a
-question, or needs interaction, Codex records the skip reason and continues the
-normal Codex flow.
-
 ## Layout
 
 ```text
@@ -147,7 +123,6 @@ plugins/
   chromemcp-browser/  # Codex plugin plus ChromeMCP MCP server/runtime
   bashlane/           # Codex plugin plus wsl-run installer/helper
   overnight-runner/   # Codex plugin plus long todo guard/helper
-  claude-code-adversarial-review/  # Claude review plus Codex verification skill
 scripts/
   install-rizonetech-local.ps1
 ```
