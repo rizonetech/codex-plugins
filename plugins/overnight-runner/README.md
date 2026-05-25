@@ -18,6 +18,9 @@ rollback gates, destructive/cutover work without explicit approval, and
 duplicates. Verified findings are reported to `.codex/reports/` and missing
 guardrail items are added back into the todo as unchecked `Adversarial review:`
 items so the run can implement them instead of rediscovering the gaps later.
+This review is not a pause point: it reports, repairs the todo file, and the
+runner continues into the first safe actionable slice unless the normal
+destructive/safety blocker rules leave no safe work remaining.
 
 Existing checked todo items are treated as claims. The runner requires each
 current `[x]` item to be reviewed with current evidence before finish-check can

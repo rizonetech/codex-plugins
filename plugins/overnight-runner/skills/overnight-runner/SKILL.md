@@ -57,6 +57,11 @@ Treat those inserted `Adversarial review:` items as real work. Implement or
 document/block them before final completion; do not delete them merely to pass
 the finish check.
 
+The adversarial todo review is not a pause point. It must report, repair the
+todo file, and continue into the first safe actionable slice. It may add
+blockers or guardrail work, but it must not stop the overnight run unless the
+normal autonomy rules below say there is no safe progress remaining.
+
 If a start preflight records ChromeMCP as blocked, keep going only on work that
 can be honestly completed without browser evidence. User-facing UI, navigation,
 visual, CRUD, GRUD, and production smoke items remain incomplete until real
