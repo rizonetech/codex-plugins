@@ -29,6 +29,22 @@ git add todo/ui.md artifacts/browser/report.json artifacts/browser/desktop.png
 git commit -q -m "seed test repo"
 
 python3 "$RUNNER" start todo/ui.md >/tmp/overnight-start.out
+grep -q "Adversarial todo review:" /tmp/overnight-start.out
+grep -q "Adversarial todo review report:" /tmp/overnight-start.out
+grep -q "Adversarial review:" todo/ui.md
+test -d .codex/reports
+ls .codex/reports/overnight-todo-adversarial-review-*.json >/dev/null
+python3 "$RUNNER" status > /tmp/overnight-status.json
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+state = json.loads(Path("/tmp/overnight-status.json").read_text())
+review = state["todo_adversarial_review"]
+assert review["status"] in {"fixed", "passed"}, review["status"]
+assert review["report_path"].startswith(".codex/reports/"), review["report_path"]
+assert review["item_count"] >= 2
+PY
 python3 "$RUNNER" update \
   --slice "Admin settings CRUD" \
   --gate implemented=passed \
@@ -74,6 +90,32 @@ python3 "$RUNNER" finish-check --allow-blocked >/tmp/overnight-finish.out
 python3 "$RUNNER" handoff --write-todo >/tmp/overnight-handoff.out
 grep -q "## Run Handoff" todo/ui.md
 python3 "$RUNNER" clear "test completed" >/tmp/overnight-clear.out
+
+review_tmp="$tmp/review"
+mkdir -p "$review_tmp/todo"
+cd "$review_tmp"
+git init -q
+git config user.email test@example.invalid
+git config user.name "Overnight Runner Test"
+cat > todo/review.md <<'EOF'
+# Todo
+
+- [ ] Polish all admin UI screens
+- [ ] Deploy production release
+EOF
+python3 "$RUNNER" todo-review todo/review.md --apply > "$tmp/todo-review.json"
+grep -q "Adversarial review: Define a bounded coverage matrix" todo/review.md
+grep -q "Adversarial review: Add deploy preflight" todo/review.md
+python3 - "$tmp/todo-review.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+review = json.loads(Path(sys.argv[1]).read_text())
+assert review["status"] == "fixed", review["status"]
+assert len(review["applied_fixes"]) >= 2
+assert Path(review["report_path"]).parts[:2] == (".codex", "reports")
+PY
 
 laravel_tmp="$tmp/laravel"
 mkdir -p "$laravel_tmp/app/Providers" "$laravel_tmp/todo"

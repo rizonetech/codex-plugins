@@ -7,7 +7,17 @@ The plugin writes state to the active repository:
 
 ```text
 .codex/state/overnight-runner.json
+.codex/reports/overnight-todo-adversarial-review-*.json
 ```
+
+Before `start` runs normal preflight, it adversarially reviews every todo item
+in the file. The review looks for completion-accounting risks such as checked
+items that still describe open work, broad/global claims without a bounded
+coverage matrix, UI work without browser/visual evidence, deploy items without
+rollback gates, destructive/cutover work without explicit approval, and
+duplicates. Verified findings are reported to `.codex/reports/` and missing
+guardrail items are added back into the todo as unchecked `Adversarial review:`
+items so the run can implement them instead of rediscovering the gaps later.
 
 Existing checked todo items are treated as claims. The runner requires each
 current `[x]` item to be reviewed with current evidence before finish-check can
@@ -47,6 +57,7 @@ Multiple modules can be active in one repository, such as Laravel plus Node.
 ```bash
 ~/.codex/tools/overnight-runner start todo/example.md
 ~/.codex/tools/overnight-runner preflight todo/example.md
+~/.codex/tools/overnight-runner todo-review todo/example.md --apply
 ~/.codex/tools/overnight-runner checked-review --line 12 --status passed --evidence "focused test passed"
 ~/.codex/tools/overnight-runner update --slice "Login flow" --gate implemented=passed
 ~/.codex/tools/overnight-runner finish-check

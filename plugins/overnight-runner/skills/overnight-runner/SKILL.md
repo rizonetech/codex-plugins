@@ -42,6 +42,21 @@ For explicit overnight or long autonomous todo requests, start with:
 "${OR[@]}" start path/to/todo.md
 ```
 
+`start` performs an adversarial todo review before normal preflight. It scans
+all checked and unchecked todo items, writes a report under `.codex/reports/`,
+verifies whether each proposed fix is already present, and adds missing
+guardrail work back into the todo as unchecked `Adversarial review:` items.
+Use the standalone form when you need to inspect or repair the todo before a
+full run:
+
+```bash
+"${OR[@]}" todo-review path/to/todo.md --apply
+```
+
+Treat those inserted `Adversarial review:` items as real work. Implement or
+document/block them before final completion; do not delete them merely to pass
+the finish check.
+
 If a start preflight records ChromeMCP as blocked, keep going only on work that
 can be honestly completed without browser evidence. User-facing UI, navigation,
 visual, CRUD, GRUD, and production smoke items remain incomplete until real

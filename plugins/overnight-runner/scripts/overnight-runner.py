@@ -163,6 +163,9 @@ DANGEROUS_OPERATION_PATTERNS = {
     "copyright_removal": (r"\bcopyright\b.*\bremov", r"\bremov\w*\b.*\bcopyright\b"),
     "destructive_data": (r"\bdrop\s+table\b", r"\btruncate\b", r"\bdelete\b.*\bdata\b"),
 }
+TODO_ITEM_RE = re.compile(r"^(\s*)[-*]\s+\[([ xX])\]\s+(.*)$")
+ADVERSARIAL_FIX_PREFIX = "Adversarial review:"
+TODO_REVIEW_CONTEXT_RADIUS = 3
 
 
 def now() -> str:
@@ -276,6 +279,239 @@ def parse_todo_items(root: Path, todo_file: str | None) -> dict[str, list[dict[s
         if re.search(r"\b(Blocked|Deferred):", line):
             blockers.append({"line": index, "text": line.strip()})
     return {"checked": checked, "unchecked": unchecked, "blockers": blockers}
+
+
+def all_todo_items(root: Path, todo_file: str | None) -> list[dict[str, Any]]:
+    todo_path = resolve_todo(root, todo_file)
+    if not todo_path or not todo_path.exists():
+        raise SystemExit(f"Todo file not found: {todo_file}")
+    items = []
+    for index, line in enumerate(todo_path.read_text(encoding="utf-8").splitlines(), 1):
+        match = TODO_ITEM_RE.match(line)
+        if not match:
+            continue
+        indent, marker, claim = match.groups()
+        claim = claim.strip()
+        items.append(
+            {
+                "line": index,
+                "indent": indent,
+                "marker": marker,
+                "status": "checked" if marker.lower() == "x" else "unchecked",
+                "text": line.strip(),
+                "claim": claim,
+                "claim_id": claim_id(claim),
+            }
+        )
+    return items
+
+
+def todo_context(lines: list[str], line_number: int, radius: int = TODO_REVIEW_CONTEXT_RADIUS) -> str:
+    start = max(0, line_number - radius - 1)
+    end = min(len(lines), line_number + radius)
+    return "\n".join(lines[start:end])
+
+
+def todo_review_finding_id(rule: str, line_number: int, claim: str, fix: str) -> str:
+    raw = f"{rule}:{line_number}:{claim}:{fix}"
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+
+
+def fix_already_present(lines: list[str], line_number: int, fix: str) -> bool:
+    normalized_fix = re.sub(r"\s+", " ", fix.strip().lower())
+    if not normalized_fix:
+        return True
+    local = todo_context(lines, line_number, radius=8).lower()
+    whole = "\n".join(lines).lower()
+    return normalized_fix in re.sub(r"\s+", " ", local) or normalized_fix in re.sub(r"\s+", " ", whole)
+
+
+def add_todo_review_fixes(root: Path, todo_file: str, findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    todo_path = resolve_todo(root, todo_file)
+    if not todo_path or not todo_path.exists():
+        raise SystemExit(f"Todo file not found: {todo_file}")
+    lines = todo_path.read_text(encoding="utf-8").splitlines()
+    added: list[dict[str, Any]] = []
+    insertions_by_line: dict[int, list[str]] = {}
+    for finding in findings:
+        if finding.get("verification_status") != "verified":
+            continue
+        line_number = int(finding["line"])
+        fix = str(finding["fix"]).strip()
+        if not fix or fix_already_present(lines, line_number, fix):
+            finding["verification_status"] = "already-addressed"
+            continue
+        parent_line = lines[line_number - 1] if 0 < line_number <= len(lines) else ""
+        indent = todo_line_indent(parent_line) + "  "
+        addition = f"{indent}- [ ] {ADVERSARIAL_FIX_PREFIX} {fix}"
+        insertions_by_line.setdefault(line_number, []).append(addition)
+        added.append({"finding_id": finding["id"], "line": line_number, "text": addition.strip()})
+        finding["todo_fix"] = addition.strip()
+
+    if not insertions_by_line:
+        return []
+
+    offset = 0
+    for line_number in sorted(insertions_by_line):
+        index = line_number + offset
+        additions = insertions_by_line[line_number]
+        lines[index:index] = additions
+        offset += len(additions)
+    todo_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return added
+
+
+def build_adversarial_todo_review(root: Path, todo_file: str) -> dict[str, Any]:
+    todo_path = resolve_todo(root, todo_file)
+    if not todo_path or not todo_path.exists():
+        raise SystemExit(f"Todo file not found: {todo_file}")
+    lines = todo_path.read_text(encoding="utf-8").splitlines()
+    items = all_todo_items(root, todo_file)
+    findings: list[dict[str, Any]] = []
+
+    def add_finding(
+        *,
+        rule: str,
+        severity: str,
+        item: dict[str, Any],
+        evidence: str,
+        impact: str,
+        fix: str,
+    ) -> None:
+        verification_status = "already-addressed" if fix_already_present(lines, item["line"], fix) else "verified"
+        findings.append(
+            {
+                "id": todo_review_finding_id(rule, item["line"], item["claim"], fix),
+                "rule": rule,
+                "severity": severity,
+                "line": item["line"],
+                "item_status": item["status"],
+                "claim": item["claim"],
+                "evidence": evidence,
+                "impact": impact,
+                "fix": fix,
+                "verification_status": verification_status,
+            }
+        )
+
+    seen_claims: dict[str, dict[str, Any]] = {}
+    for item in items:
+        claim = item["claim"]
+        context = todo_context(lines, item["line"]).lower()
+        normalized = re.sub(r"[^a-z0-9]+", " ", claim.lower()).strip()
+        if normalized in seen_claims:
+            first = seen_claims[normalized]
+            add_finding(
+                rule="duplicate-todo-item",
+                severity="Low",
+                item=item,
+                evidence=f"Line {item['line']} duplicates line {first['line']} after normalization.",
+                impact="Duplicate todo items can make completion accounting ambiguous.",
+                fix=f"Merge or differentiate duplicate todo item from line {first['line']}: {claim}",
+            )
+        else:
+            seen_claims[normalized] = item
+
+        if item["status"] == "checked" and re.search(r"\b(blocked|deferred|remaining|open|todo|needs?|missing)\b", claim, flags=re.I):
+            add_finding(
+                rule="checked-item-contains-open-work",
+                severity="Medium",
+                item=item,
+                evidence="The item is checked but still contains wording that indicates open or blocked work.",
+                impact="The runner may trust an incomplete claim and skip required implementation.",
+                fix=f"Reconcile completed status for line {item['line']}; either uncheck it or add the missing work as explicit unchecked subitems.",
+            )
+
+        if re.search(r"\b(deploy|production|release|publish|laravel cloud)\b", claim, flags=re.I) and not re.search(
+            r"\b(rollback|deploy(?:ment)? pointer|post-?deploy|cloud queue|pending|running|recovery)\b",
+            context,
+            flags=re.I,
+        ):
+            add_finding(
+                rule="deploy-item-lacks-rollback-gate",
+                severity="High",
+                item=item,
+                evidence="The item references deploy/release/production work but nearby todo text does not mention rollback, deployment queue, or post-deploy verification.",
+                impact="An overnight run could deploy without a recorded rollback or deployment-safety gate.",
+                fix=f"Add deploy preflight, rollback pointer, and post-deploy verification steps for line {item['line']}: {claim}",
+            )
+
+        if pattern_matches(claim, CLASSIFICATION_PATTERNS["ui_browser_work"]) and not re.search(
+            r"\b(chromemcp|browser|screenshot|visual|viewport|mobile|desktop|overflow|console)\b",
+            context,
+            flags=re.I,
+        ):
+            add_finding(
+                rule="ui-item-lacks-browser-evidence",
+                severity="Medium",
+                item=item,
+                evidence="The item is UI/browser-facing but nearby todo text does not require browser, visual, or viewport evidence.",
+                impact="The runner could mark visible UX work complete without real browser proof.",
+                fix=f"Add ChromeMCP browser evidence, visual QA, and viewport checks for line {item['line']}: {claim}",
+            )
+
+        if pattern_matches(claim, CLASSIFICATION_PATTERNS["destructive_cutover"]) and not re.search(
+            r"\b(approval|rollback|backup|restore|manifest|explicit)\b",
+            context,
+            flags=re.I,
+        ):
+            add_finding(
+                rule="destructive-item-lacks-approval-rollback",
+                severity="High",
+                item=item,
+                evidence="The item appears destructive or cutover-related but nearby todo text does not require explicit approval and rollback evidence.",
+                impact="The runner could perform destructive work without current-thread authorization or recovery instructions.",
+                fix=f"Add explicit approval, backup, rollback, and verification requirements before line {item['line']} can be executed.",
+            )
+
+        if re.search(r"\b(all|every|global|full|across|complete|entire)\b", claim, flags=re.I) and not re.search(
+            r"\b(matrix|inventory|surface|scope|sample|evidence|checklist|coverage)\b",
+            context,
+            flags=re.I,
+        ):
+            add_finding(
+                rule="broad-item-lacks-coverage-matrix",
+                severity="Medium",
+                item=item,
+                evidence="The item makes a broad/global claim but nearby todo text does not define a coverage matrix, inventory, or bounded scope.",
+                impact="The runner may over-claim completion after checking only a narrow sample.",
+                fix=f"Define a bounded coverage matrix or surface inventory for line {item['line']}: {claim}",
+            )
+
+    status = "passed" if not any(f["verification_status"] == "verified" for f in findings) else "needs-fixes"
+    return {
+        "status": status,
+        "captured_at": now(),
+        "todo_file": todo_file,
+        "item_count": len(items),
+        "checked_count": sum(1 for item in items if item["status"] == "checked"),
+        "unchecked_count": sum(1 for item in items if item["status"] == "unchecked"),
+        "findings": findings,
+    }
+
+
+def write_todo_review_report(root: Path, review: dict[str, Any]) -> Path:
+    reports = root / ".codex/reports"
+    reports.mkdir(parents=True, exist_ok=True)
+    todo_label = re.sub(r"[^a-zA-Z0-9_.-]+", "-", str(review["todo_file"])).strip("-")
+    digest = hashlib.sha1(json.dumps(review, sort_keys=True).encode("utf-8")).hexdigest()[:10]
+    path = reports / f"overnight-todo-adversarial-review-{todo_label}-{digest}.json"
+    path.write_text(json.dumps(review, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
+def run_adversarial_todo_review(root: Path, todo_file: str, *, apply: bool) -> dict[str, Any]:
+    review = build_adversarial_todo_review(root, todo_file)
+    if apply:
+        additions = add_todo_review_fixes(root, todo_file, review["findings"])
+        review["applied_fixes"] = additions
+        if additions:
+            review["status"] = "fixed"
+    else:
+        review["applied_fixes"] = []
+    report = write_todo_review_report(root, review)
+    review["report_path"] = str(report.relative_to(root))
+    return review
 
 
 def pattern_matches(text: str, patterns: tuple[str, ...]) -> bool:
@@ -610,6 +846,7 @@ def build_preflight(root: Path, todo_file: str | None) -> dict[str, Any]:
 
 def command_start(args: argparse.Namespace) -> None:
     root = repo_root()
+    todo_review = run_adversarial_todo_review(root, args.todo_file, apply=True)
     preflight = build_preflight(root, args.todo_file)
     state = {
         "active": True,
@@ -619,6 +856,7 @@ def command_start(args: argparse.Namespace) -> None:
         "current_slice": None,
         "status": "started" if preflight["status"] == "passed" else "preflight_blocked",
         "preflight": preflight,
+        "todo_adversarial_review": todo_review,
         "modules": preflight["modules"],
         "module_checks": preflight["module_checks"],
         "gates": blank_gates(preflight),
@@ -666,10 +904,12 @@ def command_start(args: argparse.Namespace) -> None:
         "deploy": {"status": "pending" if "deploy" in preflight["classifications"] else "not-applicable", "evidence": [], "blockers": []},
         "commit_push": {"status": "pending", "commit_sha": None, "branch": None, "evidence": [], "blockers": []},
         "rollback_manifest": {},
-        "next_action": "Read todo, reconcile the codebase, and start the first unblocked slice.",
+        "next_action": "Read the adversarial todo review report, reconcile the codebase, and start the first unblocked slice.",
     }
     write_state(root, state)
     print(f"Started Overnight Runner: {args.todo_file}")
+    print(f"Adversarial todo review: {todo_review['status']} ({len(todo_review['findings'])} findings, {len(todo_review.get('applied_fixes') or [])} fixes)")
+    print(f"Adversarial todo review report: {todo_review['report_path']}")
     print("Preflight classifications: " + ", ".join(preflight["classifications"]))
     print("Modules: " + ", ".join(module["name"] for module in preflight["modules"]))
     print(f"ChromeMCP: {preflight['chromemcp']['status']}")
@@ -684,6 +924,17 @@ def command_preflight(args: argparse.Namespace) -> None:
     root = repo_root()
     preflight = build_preflight(root, args.todo_file)
     print(json.dumps(preflight, indent=2, sort_keys=True))
+
+
+def command_todo_review(args: argparse.Namespace) -> None:
+    root = repo_root()
+    review = run_adversarial_todo_review(root, args.todo_file, apply=args.apply)
+    state = read_state(root)
+    if state:
+        state["todo_adversarial_review"] = review
+        state["updated_at"] = now()
+        write_state(root, state)
+    print(json.dumps(review, indent=2, sort_keys=True))
 
 
 def ensure_state(root: Path) -> dict[str, Any]:
@@ -1039,6 +1290,14 @@ def existing_artifact_errors(root: Path, label: str, paths: list[str] | None, *,
 def finish_errors(root: Path, state: dict[str, Any], *, allow_blocked: bool) -> list[str]:
     errors = []
     todo_file = state.get("todo_file")
+    todo_review = state.get("todo_adversarial_review") or {}
+    if todo_file:
+        if not todo_review:
+            errors.append("adversarial todo review has not been run")
+        elif not todo_review.get("report_path"):
+            errors.append("adversarial todo review did not record a report_path")
+        elif todo_review.get("status") == "needs-fixes":
+            errors.append("adversarial todo review has verified findings that were not added back to the todo")
     current_checked = parse_todo_items(root, todo_file)["checked"] if todo_file else []
     review = state.get("checked_item_review") or {}
     reviewed_items = review.get("items") or {}
@@ -1231,6 +1490,11 @@ def build_parser() -> argparse.ArgumentParser:
     preflight = sub.add_parser("preflight", help="Classify a todo and probe ChromeMCP.")
     preflight.add_argument("todo_file", nargs="?")
     preflight.set_defaults(func=command_preflight)
+
+    todo_review = sub.add_parser("todo-review", help="Adversarially review a todo file and optionally add missing guardrail items.")
+    todo_review.add_argument("todo_file")
+    todo_review.add_argument("--apply", action="store_true", help="Add verified missing guardrail items back into the todo file.")
+    todo_review.set_defaults(func=command_todo_review)
 
     update = sub.add_parser("update", help="Update state, gates, evidence, and blockers.")
     update.add_argument("--todo-file")
