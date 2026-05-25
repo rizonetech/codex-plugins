@@ -1,25 +1,31 @@
 ---
 name: claude-code-adversarial-review
-description: Adversarially review Claude Code changes from Codex with evidence-first severity findings, false-positive discipline, and re-review guidance.
+description: Ask Claude Code to adversarially review Codex changes, then verify Claude's findings with file-line evidence before fixing, rejecting, or accepting them.
 ---
 
 # Claude Code Adversarial Review
 
-Use this skill when the user asks Codex to review Claude Code output, a Claude Code PR, a Claude Code diff, a completed TODO section, or any change described as needing an adversarial review.
+Use this skill when the user asks for Claude Code adversarial review, Claude review of Codex work, external review of Codex changes, review of a TODO section Codex completed, or verification of Claude's review findings.
 
-You are the external reviewer. Claude Code's implementation is not presumed correct, but neither are your suspicions. A finding is valid only when it is verified in the actual repository with file and line evidence.
+The workflow is intentionally two-party:
+
+1. Claude Code performs the adversarial review of Codex's changes.
+2. Codex verifies every Claude finding against the repository before acting.
+
+Claude is the skeptical reviewer. Codex is responsible for evidence, triage, fixes, and final accountability.
 
 ## Review Contract
 
-- Inspect the real diff, commit, PR patch, TODO section, and relevant surrounding code before reporting findings.
-- Do not rely on Claude Code summaries, completion claims, or changelog text as evidence.
-- Verify each finding against concrete code paths, callers, configuration, tests, or runtime behavior.
-- Classify each potential issue as `Fix`, `Reject`, `Accept`, or `Question`.
-- Treat `Critical` and `High` findings as blockers until fixed or explicitly rejected with evidence.
+- Do not present Codex self-review as the adversarial review.
+- Ask Claude Code to review the real diff, commit, PR patch, TODO section, and relevant surrounding code.
+- Treat Claude's findings as claims, not facts.
+- Verify each Claude finding against concrete code paths, callers, configuration, tests, or runtime behavior.
+- Classify each Claude finding as `Fix`, `Reject`, `Accept`, or `Question`.
+- Treat verified `Critical` and `High` findings as blockers until fixed or explicitly rejected with evidence.
 - Keep scope bounded to the requested diff or TODO section unless a changed contract creates wider risk.
 - Do not request unrelated refactors, style churn, or speculative features.
 
-## Initial Inspection
+## Prepare The Claude Review
 
 Gather the smallest complete review context:
 
@@ -30,13 +36,39 @@ git diff --name-only
 git diff
 ```
 
-If the review targets a commit, branch, or PR, inspect that comparison instead of only the working tree. If the user gives a TODO file or section, read the TODO file and the changed files it references.
+If the review targets a commit, branch, or PR, inspect that comparison instead of only the working tree. If the user gives a TODO file or section, read the TODO file and identify the changed files it references.
 
 When code has already been committed, compare the implementation against its base branch or parent commit. When the base is unclear, state the assumption and use the most defensible local comparison.
 
-## Adversarial Checklist
+If the `claude` CLI is available, run Claude Code non-interactively from the repository root. Use a prompt shaped like this:
 
-Apply the checklist according to the stack and touched behavior:
+```bash
+claude -p '<prompt>'
+```
+
+Prompt Claude with:
+
+```text
+[review-kind: adversarial]
+
+You are reviewing Codex changes as an external adversarial reviewer.
+
+Scope:
+- Review only the provided diff/TODO/commit scope unless a changed contract creates wider risk.
+- Look for real bugs, regressions, security issues, missing rollback/error handling, concurrency problems, broken wiring, data loss, and insufficient tests.
+- Do not give style-only feedback unless it hides a defect.
+- Every finding must include severity, file:line, evidence, impact, and a concrete fix or rejection test.
+- If no actionable issues exist, say so directly and list residual risks separately.
+
+Review target:
+<describe diff, commit range, TODO section, or PR>
+```
+
+Prefer passing Claude enough context to inspect files itself. If Claude CLI is unavailable, blocked, or unauthenticated, stop with `BLOCKED` and give the exact Claude prompt the user can run manually.
+
+## Claude Checklist
+
+Ask Claude to apply this checklist according to the stack and touched behavior:
 
 - Functional correctness, edge cases, off-by-one behavior, empty/null/malformed input.
 - Regressions in callers, contracts, public APIs, command behavior, routes, config, schemas, and generated artifacts.
@@ -51,15 +83,16 @@ Apply the checklist according to the stack and touched behavior:
 
 For UI/browser claims, require real browser evidence when the task depends on it. Prefer ChromeMCP-visible verification if available; headless or raw CDP evidence is diagnostic and should not replace a required visible browser check.
 
-## False-Positive Discipline
+## Verify Claude Findings
 
-Before reporting, try to disprove your own finding:
+Before reporting or fixing a Claude finding, try to disprove it:
 
-- Search for callers, guards, feature flags, middleware, validators, and framework guarantees.
-- Check whether a lock, transaction, auth check, or sanitizer is provided by the caller.
+- Open the cited file and line; confirm the cited code exists.
+- Search for callers, guards, feature flags, middleware, validators, generated paths, framework guarantees, and tests.
+- Check whether a lock, transaction, auth check, sanitizer, or invariant is provided by the caller.
 - Distinguish impossible states from merely non-obvious states.
-- Treat uncertainty as an open question or residual risk, not as a defect.
-- Do not flag missing tests as a functional bug unless the behavior is unverified and high-risk.
+- Treat uncertainty as `Question`, not as a verified defect.
+- Do not mark a finding `Fix` only because Claude said it confidently.
 
 Common rejects:
 
@@ -68,14 +101,16 @@ Common rejects:
 - A buffer or length concern covered by a static assertion or bounded parser.
 - A dead-code claim without checking generated calls, reflection, hooks, routes, or external entry points.
 
-## Findings Format
+## Verified Findings Format
 
-Lead with findings. Order by severity. Use this shape:
+Lead with verified findings. Order by severity. Use this shape:
 
 ```text
 [High] Title
+Claude claim: Short summary of Claude's finding.
+Verdict: Fix | Reject | Accept | Question
 File/line: path/to/file.ext:123
-Evidence: What the code does and how you verified it.
+Evidence: What Codex verified in the repository.
 Impact: What breaks, who is affected, and when.
 Required fix or rejection test: The specific change or evidence needed to close it.
 ```
@@ -87,17 +122,18 @@ Severity rubric:
 - `Medium`: edge-case incorrectness, incomplete error handling, compatibility risk, missing test for non-trivial changed behavior.
 - `Low`: maintainability, minor performance, naming, local style, or small test hygiene issue.
 
-If no actionable findings exist, say so clearly and list residual risks or test gaps separately.
+If Claude returns no actionable findings, Codex must still inspect the diff enough to verify that the no-finding result is plausible. Say what was checked.
 
 ## Fix And Re-Review Loop
 
-If the user asks you to fix findings:
+If the user asks Codex to fix verified findings:
 
 1. Fix root causes with the smallest safe code change.
 2. Run relevant tests or targeted verification.
-3. Re-review the exact previous findings against the updated code.
-4. Repeat up to three rounds for unresolved `Critical` or `High` issues.
-5. Escalate clearly if a blocker remains unresolved after three rounds.
+3. Ask Claude Code to re-review the updated diff or the fixed findings.
+4. Verify Claude's new findings or confirmations.
+5. Repeat up to three rounds for unresolved `Critical` or `High` issues.
+6. Escalate clearly if a blocker remains unresolved after three rounds.
 
 Do not weaken assertions, delete tests, or narrow checks merely to make the review pass.
 
@@ -105,9 +141,9 @@ Do not weaken assertions, delete tests, or narrow checks merely to make the revi
 
 End with exactly one verdict:
 
-- `PASS`: no actionable findings and no material test gaps.
+- `PASS`: Claude found no actionable issues, Codex verification agrees, and no material test gaps remain.
 - `PASS WITH LOWS`: only Low findings or minor residual risks remain.
-- `NEEDS FIXES`: Medium or higher actionable findings remain.
-- `BLOCKED`: required context, build, tests, credentials, or browser access is missing.
+- `NEEDS FIXES`: Medium or higher verified findings remain.
+- `BLOCKED`: Claude review could not run, or required context, build, tests, credentials, or browser access is missing.
 
-Also include the key files or commands inspected and any residual risk that a maintainer should still understand.
+Also include the Claude command or manual prompt used, key files or commands Codex inspected, and any residual risk that a maintainer should still understand.

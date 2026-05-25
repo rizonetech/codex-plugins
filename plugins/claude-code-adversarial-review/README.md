@@ -1,8 +1,8 @@
 # Claude Code Adversarial Review
 
-Codex plugin for reviewing Claude Code output as an external adversarial reviewer.
+Codex plugin for asking Claude Code to adversarially review Codex changes, then having Codex verify Claude's findings before acting on them.
 
-Use it when Claude Code has implemented a task, changed a TODO section, opened a PR, or produced a diff that needs a skeptical second pass. The skill requires Codex to inspect the actual code, cite file and line evidence, separate real defects from false positives, and block completion on unresolved Critical or High findings.
+Use it when Codex has implemented a task, changed a TODO section, opened a PR, or produced a diff that needs a skeptical second pass from Claude Code. The skill requires Claude to produce adversarial findings and requires Codex to verify each finding against the actual code before fixing, rejecting, or accepting it.
 
 ## Install
 
@@ -17,7 +17,7 @@ Restart Codex after installation.
 ## Typical Prompts
 
 ```text
-Use Claude Code Adversarial Review on this diff
-Review Claude Code's changes for bugs and regressions
-Run an adversarial review of this TODO section
+Use Claude Code Adversarial Review on my Codex changes
+Ask Claude Code to review this diff, then verify the findings
+Run Claude Code adversarial review on this TODO section
 ```

@@ -123,18 +123,19 @@ ChromeMCP evidence is captured.
 
 ## Claude Code Adversarial Review
 
-Use this plugin when Claude Code has implemented a task, produced a diff, or
-completed a TODO section and Codex should review it as an external adversarial
-reviewer.
+Use this plugin when Codex has implemented a task, produced a diff, or completed
+a TODO section and Claude Code should review it as an external adversarial
+reviewer. Codex then verifies each Claude finding before fixing, rejecting, or
+accepting it.
 
 ```text
-Use Claude Code Adversarial Review on this diff
-Review Claude Code's changes for bugs and regressions
-Run an adversarial review of this TODO section
+Use Claude Code Adversarial Review on my Codex changes
+Ask Claude Code to review this diff, then verify the findings
+Run Claude Code adversarial review on this TODO section
 ```
 
 The skill requires file and line evidence for findings, rejects unverified
-suspicions, and blocks completion on unresolved Critical or High issues.
+Claude claims, and blocks completion on unresolved Critical or High issues.
 
 ## Layout
 
@@ -143,7 +144,7 @@ plugins/
   chromemcp-browser/  # Codex plugin plus ChromeMCP MCP server/runtime
   bashlane/           # Codex plugin plus wsl-run installer/helper
   overnight-runner/   # Codex plugin plus long todo guard/helper
-  claude-code-adversarial-review/  # Codex review skill for Claude Code output
+  claude-code-adversarial-review/  # Claude review plus Codex verification skill
 scripts/
   install-rizonetech-local.ps1
 ```
