@@ -136,6 +136,9 @@ Run Claude Code adversarial review on this TODO section
 
 The skill requires file and line evidence for findings, rejects unverified
 Claude claims, and blocks completion on unresolved Critical or High issues.
+Claude review is fail-soft: if Claude Code is unavailable, rate-limited, asks a
+question, or needs interaction, Codex records the skip reason and continues the
+normal Codex flow.
 
 ## Layout
 

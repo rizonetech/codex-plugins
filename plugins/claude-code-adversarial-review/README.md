@@ -4,6 +4,10 @@ Codex plugin for asking Claude Code to adversarially review Codex changes, then 
 
 Use it when Codex has implemented a task, changed a TODO section, opened a PR, or produced a diff that needs a skeptical second pass from Claude Code. The skill requires Claude to produce adversarial findings and requires Codex to verify each finding against the actual code before fixing, rejecting, or accepting it.
 
+The Claude review step is fail-soft. If Claude Code is unavailable, rate-limited,
+unauthenticated, asks a question, or needs interaction, Codex records
+`Claude review: skipped (<reason>)` and continues the normal Codex flow.
+
 ## Install
 
 Install through the repository-level installer:

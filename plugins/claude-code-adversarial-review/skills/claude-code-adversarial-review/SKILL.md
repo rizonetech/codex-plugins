@@ -24,6 +24,20 @@ Claude is the skeptical reviewer. Codex is responsible for evidence, triage, fix
 - Treat verified `Critical` and `High` findings as blockers until fixed or explicitly rejected with evidence.
 - Keep scope bounded to the requested diff or TODO section unless a changed contract creates wider risk.
 - Do not request unrelated refactors, style churn, or speculative features.
+- Never break the normal Codex flow because Claude is unavailable, rate-limited, unauthenticated, or asking for more information.
+
+## Fail-Soft Behavior
+
+Claude review is opportunistic external signal, not a hard runtime dependency.
+
+- Run Claude Code non-interactively only.
+- If Claude hits a usage limit, exits non-zero, is unauthenticated, is unavailable, asks a question, requests permission, or needs interaction, do not ask the user a follow-up question.
+- Record `Claude review: skipped (<reason>)` in the final response or handoff notes.
+- Continue with Codex's normal implementation, verification, tests, and self-review.
+- Do not mark the whole task `BLOCKED` only because Claude review could not complete.
+- Do not treat Claude questions as findings. Skip over them and proceed with the available repository evidence.
+- If Claude returns partial findings before failing or asking a question, verify the concrete findings it already provided and ignore the interactive/question part.
+- Keep the skip note brief; the goal is to preserve flow, not make the user manage the review failure.
 
 ## Prepare The Claude Review
 
@@ -59,12 +73,13 @@ Scope:
 - Do not give style-only feedback unless it hides a defect.
 - Every finding must include severity, file:line, evidence, impact, and a concrete fix or rejection test.
 - If no actionable issues exist, say so directly and list residual risks separately.
+- Do not ask questions. If context is missing, state the assumption or residual risk and continue.
 
 Review target:
 <describe diff, commit range, TODO section, or PR>
 ```
 
-Prefer passing Claude enough context to inspect files itself. If Claude CLI is unavailable, blocked, or unauthenticated, stop with `BLOCKED` and give the exact Claude prompt the user can run manually.
+Prefer passing Claude enough context to inspect files itself. If Claude CLI is unavailable, blocked, rate-limited, unauthenticated, or interactive, skip the Claude review and continue. Do not stop the Codex task for that reason.
 
 ## Claude Checklist
 
@@ -92,6 +107,7 @@ Before reporting or fixing a Claude finding, try to disprove it:
 - Check whether a lock, transaction, auth check, sanitizer, or invariant is provided by the caller.
 - Distinguish impossible states from merely non-obvious states.
 - Treat uncertainty as `Question`, not as a verified defect.
+- Skip Claude questions instead of relaying them to the user unless the main user task itself cannot proceed without an answer.
 - Do not mark a finding `Fix` only because Claude said it confidently.
 
 Common rejects:
@@ -130,10 +146,12 @@ If the user asks Codex to fix verified findings:
 
 1. Fix root causes with the smallest safe code change.
 2. Run relevant tests or targeted verification.
-3. Ask Claude Code to re-review the updated diff or the fixed findings.
-4. Verify Claude's new findings or confirmations.
+3. Ask Claude Code to re-review the updated diff or the fixed findings when Claude is available without interaction.
+4. Verify Claude's new findings or confirmations when available.
 5. Repeat up to three rounds for unresolved `Critical` or `High` issues.
 6. Escalate clearly if a blocker remains unresolved after three rounds.
+
+If Claude cannot re-review during the loop, record `Claude re-review: skipped (<reason>)` and continue with Codex verification instead of stopping.
 
 Do not weaken assertions, delete tests, or narrow checks merely to make the review pass.
 
@@ -144,6 +162,6 @@ End with exactly one verdict:
 - `PASS`: Claude found no actionable issues, Codex verification agrees, and no material test gaps remain.
 - `PASS WITH LOWS`: only Low findings or minor residual risks remain.
 - `NEEDS FIXES`: Medium or higher verified findings remain.
-- `BLOCKED`: Claude review could not run, or required context, build, tests, credentials, or browser access is missing.
+- `BLOCKED`: required non-Claude context, build, tests, credentials, or browser access is missing and Codex cannot safely continue.
 
 Also include the Claude command or manual prompt used, key files or commands Codex inspected, and any residual risk that a maintainer should still understand.

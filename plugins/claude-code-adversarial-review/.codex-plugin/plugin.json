@@ -19,7 +19,7 @@
   "interface": {
     "displayName": "Claude Code Adversarial Review",
     "shortDescription": "Have Claude Code review Codex changes, then verify each finding.",
-    "longDescription": "Claude Code Adversarial Review gives Codex a strict cross-review workflow: package Codex changes for Claude Code adversarial review, collect Claude's findings, verify every finding at file and line level, separate true defects from false positives, and block completion on unresolved high-impact issues.",
+    "longDescription": "Claude Code Adversarial Review gives Codex a non-blocking cross-review workflow: package Codex changes for Claude Code adversarial review, collect Claude's findings when available, verify every finding at file and line level, separate true defects from false positives, and continue Codex flow when Claude is rate-limited, unavailable, or asks a question.",
     "developerName": "Rizonetech",
     "category": "Rizonetech",
     "capabilities": [
