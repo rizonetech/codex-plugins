@@ -23,6 +23,11 @@ STATE_RELATIVE_PATH = Path(".codex/state/overnight-runner.json")
 GATE_STATUSES = {"pending", "passed", "failed", "blocked", "not-applicable"}
 BLOCKER_KINDS = {"app", "automation", "environment", "data", "decision", "unknown"}
 CHROMEMCP_METHODS_THAT_COUNT = {"real-mcp", "mcp-plus-cdp-screenshot"}
+SIDE_CHANGE_POLICY = (
+    "preserve user side changes, inspect every dirty file before staging, include "
+    "safe small side changes in the next coherent commit/push, and never discard/"
+    "reset/restore/checkout/clean without explicit user instruction"
+)
 REQUIRED_VISUAL_CHECKS = {
     "horizontal-overflow",
     "console-errors",
@@ -563,6 +568,8 @@ def git_snapshot(root: Path) -> dict[str, Any]:
         "branch": (branch.get("stdout") or "").strip(),
         "entries": entries,
         "dirty_count": len(entries),
+        "side_change_candidates": [entry for entry in entries],
+        "side_change_policy": SIDE_CHANGE_POLICY,
     }
 
 
@@ -838,6 +845,7 @@ def build_preflight(root: Path, todo_file: str | None) -> dict[str, Any]:
         "notes": [
             "Project modules are detected from repository markers. Apply only the module rules that match this repository.",
             "Every checked todo item must be verified against current code/evidence before trusting it.",
+            SIDE_CHANGE_POLICY,
             "ChromeMCP is preferred for user-facing verification.",
             "If ChromeMCP is blocked, browser/UI completion gates must remain blocked until real evidence is captured.",
         ],

@@ -1,7 +1,7 @@
 {
   "name": "overnight-runner",
-  "version": "0.1.0",
-  "description": "Run long autonomous todo files with adversarial todo review, guarded slice gates, and visible ChromeMCP verification.",
+  "version": "0.1.1",
+  "description": "Run long autonomous todo files with adversarial todo review, side-change preservation, guarded slice gates, and visible ChromeMCP verification.",
   "author": {
     "name": "Rizonetech (Pty) Ltd",
     "email": "derick@rizonetech.com",
@@ -18,8 +18,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Overnight Runner",
-    "shortDescription": "Review, repair, and guard long todo runs with state, gates, handoffs, and ChromeMCP checks.",
-    "longDescription": "Overnight Runner consolidates the Rizonetech overnight todo workflows into one reusable Codex plugin. Before execution it adversarially reviews the todo file, reports verified structural findings, and adds missing guardrail items back into the todo. It then tracks preflight, implementation, test, browser, visual, deploy, commit, blocker, and handoff evidence while failing gracefully when ChromeMCP is unavailable.",
+    "shortDescription": "Review, repair, preserve side edits, and guard long todo runs with state, gates, handoffs, and ChromeMCP checks.",
+    "longDescription": "Overnight Runner consolidates the Rizonetech overnight todo workflows into one reusable Codex plugin. Before execution it adversarially reviews the todo file, reports verified structural findings, and adds missing guardrail items back into the todo. It preserves safe user side changes by requiring dirty-tree inspection before staging, then tracks preflight, implementation, test, browser, visual, deploy, commit, blocker, and handoff evidence while failing gracefully when ChromeMCP is unavailable.",
     "developerName": "Rizonetech",
     "category": "Rizonetech",
     "capabilities": [

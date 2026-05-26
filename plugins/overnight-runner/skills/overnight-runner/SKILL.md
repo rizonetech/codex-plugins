@@ -101,6 +101,20 @@ Work through all unblocked todo slices. Stop only for:
 Do not final-answer just because one slice is done. Reread the todo file, update
 the state, and continue to the next actionable item.
 
+## User Side Changes
+
+The user may make small repo edits while a long run is active. Treat those edits
+as user-owned work. Before staging or committing, inspect `git status --short`
+and enough `git diff`/file content to understand every dirty file, including
+files you did not edit.
+
+Include safe user side changes in the next coherent commit/push. Safe means
+small, non-secret, non-generated, and not conflicting with the current slice.
+If a side change conflicts, contains secrets, appears unsafe, or is generated
+noise, stop and document the exact reason before touching it. Never discard,
+reset, restore, checkout, or clean those changes away unless the user explicitly
+asks for that destructive cleanup.
+
 ## Checked Item Review
 
 Treat every existing `[x]` item as a claim, not as truth. At the start of a run
@@ -167,7 +181,13 @@ For every slice:
    generate/read/update/delete path with safe test data.
 8. Update the todo/history with the commands, URLs, screenshots/reports, commit
    SHA, blockers, and next action.
-9. Update the guard state before moving to the next slice.
+9. Before staging, inspect the dirty worktree with `git status --short` plus
+   enough `git diff`/file content to understand every dirty file. Preserve and
+   include safe user side changes in the next coherent commit/push. Stop and
+   document the exact reason only when a side change conflicts with the slice,
+   contains secrets, is unsafe, or is generated noise that should not be
+   committed.
+10. Update the guard state before moving to the next slice.
 
 Example:
 
