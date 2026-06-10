@@ -36,51 +36,26 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Tag: $TAG  Version: $VERSION"
 
-      - name: Verify VERSION file matches the tag
-        run: |
-          set -e
-          TAG_VERSION="${{ steps.tag.outputs.version }}"
-          FILE_VERSION=$(tr -d '\n\r ' < VERSION 2>/dev/null || echo missing)
-          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
-            echo "ERROR: VERSION file ($FILE_VERSION) doesn't match tag ($TAG_VERSION)." >&2
-            echo "  Update VERSION before tagging, or push a corrected tag." >&2
-            exit 1
-          fi
-
       - name: Build release tarball
         run: |
           set -e
           VERSION="${{ steps.tag.outputs.version }}"
-          DIR="chromemcp-$VERSION"
-          # Stage everything we want to ship into ./$DIR/, then tar it up.
+          DIR="chromemcp-browser-$VERSION"
           mkdir -p "/tmp/stage/$DIR"
-          # rsync the whole tree minus untracked / build-artifact noise.
-          # Use --exclude rather than git-archive because we want files like
-          # VERSION and CHANGELOG to be sourced from the working tree as-is.
           rsync -a \
             --exclude='.git' \
             --exclude='.github' \
-            --exclude='node_modules' \
-            --exclude='mcp/node_modules' \
-            --exclude='mcp/logs' \
-            --exclude='mcp/.playwright-mcp' \
-            --exclude='mcp/demo-output' \
-            --exclude='mcp/.playwright.pid' \
-            --exclude='mcp/.logrotate.pid' \
             --exclude='__pycache__' \
             --exclude='*.pyc' \
             ./ "/tmp/stage/$DIR/"
-          ( cd /tmp/stage && tar -czf "chromemcp-$VERSION.tar.gz" "$DIR" )
-          mv "/tmp/stage/chromemcp-$VERSION.tar.gz" .
-          ls -lh "chromemcp-$VERSION.tar.gz"
+          ( cd /tmp/stage && tar -czf "chromemcp-browser-$VERSION.tar.gz" "$DIR" )
+          mv "/tmp/stage/chromemcp-browser-$VERSION.tar.gz" .
+          ls -lh "chromemcp-browser-$VERSION.tar.gz"
 
       - name: Generate release notes from CHANGELOG
         id: notes
         run: |
           set -e
-          # Pull the "## [Unreleased]" block out of CHANGELOG.md. If the
-          # release was prepared properly the Unreleased section now
-          # describes this version; otherwise we ship a minimal note.
           NOTES_FILE="$RUNNER_TEMP/release-notes.md"
           if grep -q '^## \[Unreleased\]' CHANGELOG.md; then
             awk '/^## \[Unreleased\]/{flag=1; next} /^## \[/{flag=0} flag' CHANGELOG.md > "$NOTES_FILE"
@@ -88,7 +63,7 @@ jobs:
             echo "See CHANGELOG.md for details." > "$NOTES_FILE"
           fi
           if [ ! -s "$NOTES_FILE" ]; then
-            echo "ChromeMCP ${{ steps.tag.outputs.tag }} — see CHANGELOG.md." > "$NOTES_FILE"
+            echo "chromemcp-browser ${{ steps.tag.outputs.tag }} — see CHANGELOG.md." > "$NOTES_FILE"
           fi
           echo "path=$NOTES_FILE" >> "$GITHUB_OUTPUT"
 
@@ -99,13 +74,10 @@ jobs:
           set -e
           TAG="${{ steps.tag.outputs.tag }}"
           VERSION="${{ steps.tag.outputs.version }}"
-          # --draft so a human ticks "publish" after sanity-checking the
-          # notes + tarball. Removes the failure mode where a malformed
-          # CHANGELOG ships as the live release blurb.
           gh release create "$TAG" \
-            --title "ChromeMCP $TAG" \
+            --title "chromemcp-browser $TAG" \
             --notes-file "${{ steps.notes.outputs.path }}" \
             --draft \
-            "chromemcp-$VERSION.tar.gz"
+            "chromemcp-browser-$VERSION.tar.gz"
           echo ""
           echo "Draft release created. Visit the repo's Releases page to publish."

@@ -1,7 +1,19 @@
 #!/usr/bin/env bash
+# chromemcp-run — thin evidence wrapper that delegates to the installed chromemcp CLI.
+# The infrastructure lives at ~/ChromeMCP; install it from:
+#   bash ~/github/ChromeMCP/scripts/install.sh --from-source
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
+CHROMEMCP="${HOME}/.local/bin/chromemcp"
+if [ ! -x "$CHROMEMCP" ]; then
+  # Fall back to PATH lookup.
+  CHROMEMCP="$(command -v chromemcp 2>/dev/null || true)"
+fi
 
-exec python3 .codex/scripts/chromemcp-run.py "$@"
+if [ -z "$CHROMEMCP" ]; then
+  echo "chromemcp not found. Install it from https://github.com/rizonetech/ChromeMCP:" >&2
+  echo "  bash ~/github/ChromeMCP/scripts/install.sh --from-source" >&2
+  exit 127
+fi
+
+exec "$CHROMEMCP" "${@:-test}"

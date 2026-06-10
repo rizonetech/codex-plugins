@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Safe ChromeMCP evidence wrapper for todo runners."""
+"""ChromeMCP evidence wrapper — delegates to the installed 'chromemcp' CLI."""
 
+import os
+import subprocess
 import sys
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
-from mcp.client.safe_runner import main
+def main() -> int:
+    args = sys.argv[1:] or ["test"]
+    chromemcp = os.path.expanduser("~/.local/bin/chromemcp")
+    if not os.path.isfile(chromemcp):
+        # Fall back to PATH lookup.
+        chromemcp = "chromemcp"
+    return subprocess.call([chromemcp] + args)
 
 
 if __name__ == "__main__":

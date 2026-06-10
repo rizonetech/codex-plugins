@@ -13,10 +13,8 @@ This repository contains the plugin payloads and installer needed to develop and
 ## Requirements
 
 - Windows 10/11 with WSL2
-- A WSL distro with Node.js 18.18 or newer for ChromeMCP
 - Google Chrome on Windows for ChromeMCP
 - PowerShell 5.1 or newer
-- Administrator approval for ChromeMCP's first bridge setup when prompted
 
 ## Install
 
@@ -62,27 +60,27 @@ definitions.
 
 ## ChromeMCP First Run
 
-After installing the plugin and restarting Codex, start ChromeMCP from WSL:
+The ChromeMCP infrastructure installs separately to `~/ChromeMCP`. After
+installing this plugin, install ChromeMCP from WSL:
 
 ```bash
-cd /home/<user>/github/codex-plugins/plugins/chromemcp-browser
-./mcp-up
-./mcp-status
+git clone https://github.com/rizonetech/ChromeMCP ~/github/ChromeMCP
+bash ~/github/ChromeMCP/scripts/install.sh --from-source
+chromemcp enable && chromemcp test
 ```
 
-On a clean machine, `./mcp-up` may launch Chrome and prompt for administrator
-approval to install the WSL-to-Windows bridge. Approve the UAC prompt. A healthy
-setup reports:
+On a clean machine, `chromemcp enable` installs the systemd service and the
+first `chromemcp up` may prompt for administrator approval to install the
+WSL-to-Windows bridge. Approve the UAC prompt. A healthy setup reports:
 
 ```text
 Endpoint: http://127.0.0.1:8931/healthz - OK
-Visible interactions: enabled
 CDP healthy: yes (...)
 ```
 
 ChromeMCP focuses the visible ChromeMCP Chrome window before browser tool calls
-by default. Set `MCP_VISIBLE_INTERACTIONS=0` before starting the server only if
-you intentionally want background behavior.
+by default. Set `MCP_VISIBLE_INTERACTIONS=0` only if you want background
+behavior.
 
 When a chat does not expose a direct ChromeMCP MCP tool, use the installed MCP
 safe runner rather than raw CDP:
@@ -120,7 +118,7 @@ ChromeMCP evidence is captured.
 
 ```text
 plugins/
-  chromemcp-browser/  # Codex plugin plus ChromeMCP MCP server/runtime
+  chromemcp-browser/  # Codex plugin (model-facing layer only; infra at ~/ChromeMCP)
   bashlane/           # Codex plugin plus wsl-run installer/helper
   overnight-runner/   # Codex plugin plus long todo guard/helper
 scripts/

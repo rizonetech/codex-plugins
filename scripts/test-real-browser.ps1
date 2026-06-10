@@ -36,8 +36,6 @@ $visibleFlag = if ($NoVisible) { "--no-visible" } else { "" }
 
 $command = @"
 set -euo pipefail
-cd "$wslRepoRoot/plugins/chromemcp-browser/mcp"
-npm ci --no-audit --no-fund >/dev/null
 node "$wslRepoRoot/scripts/real-browser-smoke-test.js" \
   --targets "$wslTargetsPath" \
   --cdp-endpoint "$CdpEndpoint" \
