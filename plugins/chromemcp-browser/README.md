@@ -8,10 +8,13 @@ real, signed-in Windows Chrome from WSL2 over MCP.
 Install the ChromeMCP infrastructure (one-time, from WSL):
 
 ```bash
-# release one-liner
+# via npm (latest release)
+npx -y @rizonetech/chromemcp install
+
+# or the curl one-liner
 curl -fsSL https://raw.githubusercontent.com/rizonetech/ChromeMCP/main/scripts/install.sh | bash
 
-# or from source
+# or from source (contributors; enables `chromemcp update`)
 git clone https://github.com/rizonetech/ChromeMCP ~/github/ChromeMCP
 bash ~/github/ChromeMCP/scripts/install.sh --from-source
 ```
