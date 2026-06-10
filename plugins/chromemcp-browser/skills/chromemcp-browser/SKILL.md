@@ -15,8 +15,10 @@ bash ~/github/ChromeMCP/scripts/install.sh --from-source
 chromemcp enable && chromemcp test
 ```
 
-The `chromemcp` CLI is at `~/.local/bin/chromemcp`. Screenshots are written to
-`~/ChromeMCP/mcp/.playwright-mcp/`.
+The `chromemcp` CLI is at `~/.local/bin/chromemcp`. Screenshots are returned inline
+and saved to `.playwright-mcp/` under the current project root (the server resolves
+output paths against the MCP client's workspace root); prefer the default
+timestamped filename.
 
 ## Start And Verify
 
