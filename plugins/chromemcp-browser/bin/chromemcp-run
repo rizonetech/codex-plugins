@@ -1,19 +1,18 @@
 #!/usr/bin/env bash
-# chromemcp-run — thin evidence wrapper that delegates to the installed chromemcp CLI.
+# chromemcp-run — evidence wrapper that delegates to the installed safe_runner.py.
 # The infrastructure lives at ~/ChromeMCP; install it from:
-#   bash ~/github/ChromeMCP/scripts/install.sh --from-source
+#   git clone https://github.com/rizonetech/ChromeMCP && bash scripts/install.sh --from-source
 set -euo pipefail
 
-CHROMEMCP="${HOME}/.local/bin/chromemcp"
-if [ ! -x "$CHROMEMCP" ]; then
-  # Fall back to PATH lookup.
-  CHROMEMCP="$(command -v chromemcp 2>/dev/null || true)"
-fi
+CHROMEMCP_HOME="${CHROMEMCP_HOME:-$HOME/ChromeMCP}"
+SAFE_RUNNER="$CHROMEMCP_HOME/mcp/client/safe_runner.py"
 
-if [ -z "$CHROMEMCP" ]; then
-  echo "chromemcp not found. Install it from https://github.com/rizonetech/ChromeMCP:" >&2
-  echo "  bash ~/github/ChromeMCP/scripts/install.sh --from-source" >&2
+if [ ! -f "$SAFE_RUNNER" ]; then
+  echo "chromemcp-run: safe_runner.py not found at $SAFE_RUNNER" >&2
+  echo "Install ChromeMCP:" >&2
+  echo "  git clone https://github.com/rizonetech/ChromeMCP" >&2
+  echo "  bash scripts/install.sh --from-source" >&2
   exit 127
 fi
 
-exec "$CHROMEMCP" "${@:-test}"
+exec env PYTHONPATH="$CHROMEMCP_HOME" python3 -m mcp.client.safe_runner "$@"

@@ -774,8 +774,8 @@ def chromemcp_health(root: Path) -> dict[str, Any]:
 def recovery_hint(root: Path) -> str:
     roots = find_chromemcp_roots(root)
     if roots:
-        return f"cd {roots[0]} && ./mcp-up && ./mcp-status"
-    return "Install or enable the ChromeMCP Browser plugin, then run ./mcp-up and ./mcp-status."
+        return "chromemcp up && chromemcp status"
+    return "Install or enable the ChromeMCP Browser plugin, then run: chromemcp up && chromemcp status"
 
 
 def required_gates(preflight: dict[str, Any]) -> set[str]:
