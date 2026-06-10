@@ -7,25 +7,47 @@ description: Use when Codex needs a Chrome-backed browser after the bundled Chro
 
 Use ChromeMCP Browser for authenticated browser verification, local web app testing, production smoke checks, and screenshots that need a persistent Windows Chrome profile.
 
+The infrastructure stack lives at `~/ChromeMCP`, installed from
+https://github.com/rizonetech/ChromeMCP via:
+
+```bash
+bash ~/github/ChromeMCP/scripts/install.sh --from-source
+chromemcp enable && chromemcp test
+```
+
+The `chromemcp` CLI is at `~/.local/bin/chromemcp`. Screenshots are returned inline
+and saved to `.playwright-mcp/` under the current project root (the server resolves
+output paths against the MCP client's workspace root); prefer the default
+timestamped filename.
+
 ## Start And Verify
 
 1. Ensure the external server is running:
 
 ```bash
-cd /path/to/codex-plugins/plugins/chromemcp-browser
-./mcp-up
+chromemcp up
 ```
 
 2. Verify the bridge before relying on it:
 
 ```bash
-cd /path/to/codex-plugins/plugins/chromemcp-browser
-bash mcp/test.sh
+chromemcp test
 ```
 
 3. Use the exposed MCP server named `chromemcp-playwright` for browser actions.
 
-If `mcp/test.sh` fails, fix ChromeMCP before claiming browser verification passed.
+If `chromemcp test` fails, run `chromemcp bridge-check --fix` to repair the
+Windows bridge, then retry `chromemcp up`. Fix ChromeMCP before claiming browser
+verification passed.
+
+## Tab Discipline
+
+- List tabs before acting; reuse the current tab for navigation.
+- Never retry a failed navigation by opening a new tab — recover health instead
+  (`chromemcp bridge-check --fix`).
+- Hard cap: 3 tabs open at once. Never close tabs you did not open this session
+  without asking the user first.
+- Close every tab you opened before finishing the task.
 
 ## Reliable Browser Testing
 

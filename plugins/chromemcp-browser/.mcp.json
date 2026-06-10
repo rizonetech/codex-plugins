@@ -6,7 +6,7 @@
       "headers": {
         "Authorization": "Bearer <TOKEN>"
       },
-      "note": "Local ChromeMCP Playwright MCP server. Start it with ./mcp-up before use. SUBSTITUTE <TOKEN> with the output of ./mcp-token. Or set MCP_NO_AUTH=1 in the server env to disable auth (NOT recommended outside single-user dev boxes)."
+      "note": "Local ChromeMCP Playwright MCP server. Start it with 'chromemcp up'. SUBSTITUTE <TOKEN> with the output of 'chromemcp token'. Install ChromeMCP from https://github.com/rizonetech/ChromeMCP."
     }
   }
 }
