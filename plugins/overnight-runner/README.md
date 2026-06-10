@@ -59,6 +59,7 @@ Multiple modules can be active in one repository, such as Laravel plus Node.
 
 ```bash
 ~/.codex/tools/overnight-runner start todo/example.md
+~/.codex/tools/overnight-runner start todo/example.md --no-browser  # skip ChromeMCP probe for non-UI runs
 ~/.codex/tools/overnight-runner preflight todo/example.md
 ~/.codex/tools/overnight-runner todo-review todo/example.md --apply
 ~/.codex/tools/overnight-runner checked-review --line 12 --status passed --evidence "focused test passed"
@@ -66,3 +67,13 @@ Multiple modules can be active in one repository, such as Laravel plus Node.
 ~/.codex/tools/overnight-runner finish-check
 ~/.codex/tools/overnight-runner handoff --write-todo
 ```
+
+The `--no-browser` flag on `start` skips the ChromeMCP health probe and marks
+`browser_verification` and `visual_qa` as not-applicable. Use it for todo runs
+that contain no user-facing UI or browser work. If UI-looking items are
+detected, a loud warning is printed and the waiver is recorded in state; the
+`finish-check` command echoes it so completion claims remain honest.
+
+The `browser_verification` gate was previously named `chromemcp_local`. State
+files from older runs are migrated on load — the legacy name is normalized to
+`browser_verification` automatically.

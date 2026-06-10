@@ -45,7 +45,7 @@ BASE_GATES = (
     "implemented",
     "automated_tests",
     "feature_gate",
-    "chromemcp_local",
+    "browser_verification",
     "visual_qa",
     "workflow_matrix",
     "browser_handoff",
@@ -228,11 +228,20 @@ def state_path(root: Path) -> Path:
     return root / STATE_RELATIVE_PATH
 
 
+def _migrate_state_gates(state: dict[str, Any]) -> dict[str, Any]:
+    """Normalize legacy gate names in a loaded state dict (in place)."""
+    gates = state.get("gates")
+    if isinstance(gates, dict) and "chromemcp_local" in gates:
+        gates["browser_verification"] = gates.pop("chromemcp_local")
+    return state
+
+
 def read_state(root: Path) -> dict[str, Any]:
     path = state_path(root)
     if not path.exists():
         return {}
-    return json.loads(path.read_text(encoding="utf-8"))
+    state = json.loads(path.read_text(encoding="utf-8"))
+    return _migrate_state_gates(state)
 
 
 def write_state(root: Path, state: dict[str, Any]) -> None:
@@ -245,6 +254,18 @@ def append_unique(target: list[str], values: list[str] | None) -> None:
     for value in values or []:
         if value and value not in target:
             target.append(value)
+
+
+def normalize_gate_name(name: str) -> str:
+    """Migrate legacy gate names to canonical names.
+
+    Accepts the old ``chromemcp_local`` name used in state files written before
+    the ``browser_verification`` rename and returns the current canonical name.
+    All other names are returned unchanged.
+    """
+    if name == "chromemcp_local":
+        return "browser_verification"
+    return name
 
 
 def resolve_todo(root: Path, todo_file: str | None) -> Path | None:
@@ -790,7 +811,7 @@ def required_gates(preflight: dict[str, Any]) -> set[str]:
     modules = module_names(preflight)
     required = {"implemented_review", "implemented", "automated_tests", "feature_gate", "todo_history_updated"}
     if "ui_browser_work" in classifications:
-        required.update({"chromemcp_local", "visual_qa", "workflow_matrix", "browser_handoff"})
+        required.update({"browser_verification", "visual_qa", "workflow_matrix", "browser_handoff"})
     if "deploy" in classifications:
         required.update({"production_deploy", "rollback_plan"})
     if "wordpress" in modules and dangerous:
@@ -817,7 +838,7 @@ def blank_gates(preflight: dict[str, Any] | None = None) -> dict[str, Any]:
     }
 
 
-def build_preflight(root: Path, todo_file: str | None) -> dict[str, Any]:
+def build_preflight(root: Path, todo_file: str | None, *, no_browser: bool = False) -> dict[str, Any]:
     todo_path = resolve_todo(root, todo_file)
     if todo_file and (todo_path is None or not todo_path.exists()):
         raise SystemExit(f"Todo file not found: {todo_file}")
@@ -826,15 +847,23 @@ def build_preflight(root: Path, todo_file: str | None) -> dict[str, Any]:
     classification = classify_text(text)
     modules = detect_modules(root)
     module_checks = module_preflight_checks(root, modules, classification["classifications"])
-    chrome = chromemcp_health(root)
+    if no_browser:
+        chrome: dict[str, Any] = {"status": "not-applicable", "reason": "--no-browser"}
+    else:
+        chrome = chromemcp_health(root)
     module_blockers = [
         {"check": name, **check}
         for name, check in module_checks.items()
         if check.get("status") == "blocked"
     ]
+    preflight_status = (
+        "passed"
+        if (no_browser or chrome["status"] == "passed") and not module_blockers
+        else "blocked"
+    )
     return {
         **classification,
-        "status": "passed" if chrome["status"] == "passed" and not module_blockers else "blocked",
+        "status": preflight_status,
         "captured_at": now(),
         "todo_file": todo_file,
         "todo_file_exists": bool(todo_path and todo_path.exists()),
@@ -860,20 +889,82 @@ def build_preflight(root: Path, todo_file: str | None) -> dict[str, Any]:
 
 def command_start(args: argparse.Namespace) -> None:
     root = repo_root()
+    no_browser: bool = getattr(args, "no_browser", False)
     todo_review = run_adversarial_todo_review(root, args.todo_file, apply=True)
-    preflight = build_preflight(root, args.todo_file)
+    preflight = build_preflight(root, args.todo_file, no_browser=no_browser)
+
+    # When --no-browser is set and the todo contains UI-looking work, warn loudly.
+    ui_waived = no_browser and "ui_browser_work" in preflight.get("classifications", [])
+    if ui_waived:
+        print(
+            "WARNING: UI/browser-looking items detected in the todo but browser "
+            "verification was explicitly waived via --no-browser. "
+            "Browser gates (browser_verification, visual_qa) will be marked "
+            "not-applicable. The waiver is recorded in state."
+        )
+
+    # Determine initial chromemcp state block.
+    if no_browser:
+        chromemcp_state: dict[str, Any] = {
+            "required_for_user_facing": False,
+            "status": "not-applicable",
+            "waived": True,
+            "waiver_reason": "--no-browser flag passed at start",
+            "method": "not-applicable",
+            "evidence": [preflight["chromemcp"]],
+            "blockers": [],
+            "report_paths": [],
+            "screenshot_paths": [],
+            "routes": [],
+            "viewports": [],
+            "final_visible_handoff": False,
+        }
+    else:
+        chromemcp_state = {
+            "required_for_user_facing": True,
+            "status": "passed" if preflight["chromemcp"]["status"] == "passed" else "blocked",
+            "method": "real-mcp",
+            "evidence": [preflight["chromemcp"]],
+            "blockers": [] if preflight["chromemcp"]["status"] == "passed" else [
+                {
+                    "at": now(),
+                    "kind": "environment",
+                    "blocker": preflight["chromemcp"].get("error") or "ChromeMCP health check did not pass.",
+                    "recovery": preflight["chromemcp"].get("recovery"),
+                }
+            ],
+            "report_paths": [],
+            "screenshot_paths": [],
+            "routes": [],
+            "viewports": [],
+            "final_visible_handoff": False,
+        }
+
+    # Build blank gates; then override browser-dependent gates as not-applicable when waived.
+    gates = blank_gates(preflight)
+    if no_browser:
+        for gate_name in ("browser_verification", "visual_qa"):
+            if gate_name in gates:
+                gates[gate_name]["status"] = "not-applicable"
+                gates[gate_name]["required"] = False
+                gates[gate_name].setdefault("evidence", []).append({
+                    "at": now(),
+                    "note": "Waived via --no-browser" + (" (UI items detected)" if ui_waived else ""),
+                })
+
     state = {
         "active": True,
         "started_at": now(),
         "updated_at": now(),
         "todo_file": args.todo_file,
+        "no_browser": no_browser,
         "current_slice": None,
         "status": "started" if preflight["status"] == "passed" else "preflight_blocked",
         "preflight": preflight,
         "todo_adversarial_review": todo_review,
         "modules": preflight["modules"],
         "module_checks": preflight["module_checks"],
-        "gates": blank_gates(preflight),
+        "gates": gates,
         "slices": {},
         "notes": [],
         "completed_slices": [],
@@ -894,25 +985,7 @@ def command_start(args: argparse.Namespace) -> None:
             },
         },
         "chromemcp_failures": {},
-        "chromemcp": {
-            "required_for_user_facing": True,
-            "status": "passed" if preflight["chromemcp"]["status"] == "passed" else "blocked",
-            "method": "real-mcp",
-            "evidence": [preflight["chromemcp"]],
-            "blockers": [] if preflight["chromemcp"]["status"] == "passed" else [
-                {
-                    "at": now(),
-                    "kind": "environment",
-                    "blocker": preflight["chromemcp"].get("error") or "ChromeMCP health check did not pass.",
-                    "recovery": preflight["chromemcp"].get("recovery"),
-                }
-            ],
-            "report_paths": [],
-            "screenshot_paths": [],
-            "routes": [],
-            "viewports": [],
-            "final_visible_handoff": False,
-        },
+        "chromemcp": chromemcp_state,
         "visual_qa": {"status": "pending", "checks": [], "evidence": [], "screenshot_paths": [], "blockers": []},
         "workflow_matrix": {"status": "pending", "matrix_paths": [], "routes": [], "viewports": [], "states": []},
         "deploy": {"status": "pending" if "deploy" in preflight["classifications"] else "not-applicable", "evidence": [], "blockers": []},
@@ -926,12 +999,17 @@ def command_start(args: argparse.Namespace) -> None:
     print(f"Adversarial todo review report: {todo_review['report_path']}")
     print("Preflight classifications: " + ", ".join(preflight["classifications"]))
     print("Modules: " + ", ".join(module["name"] for module in preflight["modules"]))
-    print(f"ChromeMCP: {preflight['chromemcp']['status']}")
-    if preflight.get("module_blockers"):
-        print("Module blockers: " + ", ".join(blocker["check"] for blocker in preflight["module_blockers"]))
-    if preflight["chromemcp"]["status"] != "passed":
-        print("ChromeMCP blocker recorded; non-browser work may continue when safe.")
-        print("Recovery: " + preflight["chromemcp"].get("recovery", "not available"))
+    if no_browser:
+        print("ChromeMCP: not-applicable (--no-browser)")
+        if ui_waived:
+            print("WARNING: UI-looking items detected; browser verification waived via --no-browser.")
+    else:
+        print(f"ChromeMCP: {preflight['chromemcp']['status']}")
+        if preflight.get("module_blockers"):
+            print("Module blockers: " + ", ".join(blocker["check"] for blocker in preflight["module_blockers"]))
+        if preflight["chromemcp"]["status"] != "passed":
+            print("ChromeMCP blocker recorded; non-browser work may continue when safe.")
+            print("Recovery: " + preflight["chromemcp"].get("recovery", "not available"))
 
 
 def command_preflight(args: argparse.Namespace) -> None:
@@ -976,7 +1054,7 @@ def update_gate(state: dict[str, Any], gate_spec: str, note: str | None = None, 
         name, status = gate_spec.split("=", 1)
     else:
         name, status = gate_spec, "passed"
-    name = name.strip()
+    name = normalize_gate_name(name.strip())
     status = status.strip()
     if name not in BASE_GATES:
         raise SystemExit(f"Unknown gate: {name}. Expected one of: {', '.join(BASE_GATES)}")
@@ -1346,7 +1424,7 @@ def finish_errors(root: Path, state: dict[str, Any], *, allow_blocked: bool) -> 
 
     chromemcp = state.get("chromemcp") or {}
     chromemcp_status = chromemcp.get("status")
-    ui_required = (state.get("gates") or {}).get("chromemcp_local", {}).get("required")
+    ui_required = (state.get("gates") or {}).get("browser_verification", {}).get("required")
     if ui_required:
         if chromemcp_status in {None, "", "pending"}:
             errors.append("ChromeMCP gate is pending")
@@ -1392,6 +1470,10 @@ def command_finish_check(args: argparse.Namespace) -> None:
     state = read_state(root)
     if not state:
         raise SystemExit("No Overnight Runner state found.")
+    # Echo --no-browser waiver so completion claims stay honest.
+    chromemcp_state = state.get("chromemcp") or {}
+    if chromemcp_state.get("waived"):
+        print("NOTE: browser verification waived via --no-browser (recorded at start)")
     todo_file = args.todo_file or state.get("todo_file")
     checked, unchecked, blockers = todo_unchecked_and_blocked(root, todo_file, args.limit)
     print(f"Finish check for {todo_file}")
@@ -1499,6 +1581,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     start = sub.add_parser("start", help="Start a guarded overnight run.")
     start.add_argument("todo_file")
+    start.add_argument(
+        "--no-browser",
+        dest="no_browser",
+        action="store_true",
+        help=(
+            "Skip the ChromeMCP health probe and mark browser gates not-applicable; "
+            "use for todo runs with no UI/browser work."
+        ),
+    )
     start.set_defaults(func=command_start)
 
     preflight = sub.add_parser("preflight", help="Classify a todo and probe ChromeMCP.")

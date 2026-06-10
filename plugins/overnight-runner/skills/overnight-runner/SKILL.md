@@ -42,6 +42,13 @@ For explicit overnight or long autonomous todo requests, start with:
 "${OR[@]}" start path/to/todo.md
 ```
 
+For runs with no UI or browser work, pass `--no-browser` to skip the ChromeMCP
+health probe and mark browser gates not-applicable:
+
+```bash
+"${OR[@]}" start path/to/todo.md --no-browser
+```
+
 `start` performs an adversarial todo review before normal preflight. It scans
 all checked and unchecked todo items, writes a report under `.codex/reports/`,
 verifies whether each proposed fix is already present, and adds missing
@@ -196,7 +203,7 @@ Example:
   --slice "Settings form" \
   --gate implemented=passed \
   --gate automated_tests=passed \
-  --gate chromemcp_local=passed \
+  --gate browser_verification=passed \
   --gate visual_qa=passed \
   --chromemcp-url "http://example.local/admin/settings" \
   --chromemcp-report "artifacts/browser/settings-report.json" \
@@ -236,7 +243,7 @@ MCP tool is exposed, use the installed safe runner instead of raw CDP:
 
 Direct CDP, ad hoc WebSocket clients, headless Playwright, or temporary browser
 libraries can be used only for diagnostics. They must be recorded as
-`fallback-cdp` or blocked evidence and must not satisfy `chromemcp_local=passed`
+`fallback-cdp` or blocked evidence and must not satisfy `browser_verification=passed`
 or production smoke completion. `mcp-plus-cdp-screenshot` counts only when MCP
 tool actions are the primary workflow proof and CDP is used solely to capture
 supplemental screenshots/diagnostics.
