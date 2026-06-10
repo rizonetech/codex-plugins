@@ -12,41 +12,34 @@ execution, or a final finish check for such a run.
 
 ## Helper Path
 
-Resolve the guard helper before starting work:
+The `overnight-runner` CLI must be installed from
+https://github.com/rizonetech/overnight-runner. Verify it is available:
 
 ```bash
-if command -v overnight-runner >/dev/null 2>&1; then
-  OR=(overnight-runner)
-elif [ -x "$HOME/.codex/tools/overnight-runner" ]; then
-  OR=("$HOME/.codex/tools/overnight-runner")
-elif [ -f "$HOME/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py" ]; then
-  OR=(python3 "$HOME/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py")
-elif [ -f "$HOME/.codex/plugins/cache/rizonetech-local/overnight-runner/0.1.0/scripts/overnight-runner.py" ]; then
-  OR=(python3 "$HOME/.codex/plugins/cache/rizonetech-local/overnight-runner/0.1.0/scripts/overnight-runner.py")
-elif [ -f "plugins/overnight-runner/scripts/overnight-runner.py" ]; then
-  OR=(python3 "$PWD/plugins/overnight-runner/scripts/overnight-runner.py")
-else
-  OR=()
-fi
+command -v overnight-runner >/dev/null 2>&1
 ```
 
-If the helper is missing, continue with the workflow manually and tell the user
-that the state helper is unavailable. Do not fall back to an old project-local
-overnight guard. Do not pretend gates passed without evidence.
+If it is missing, do NOT improvise — tell the user and offer the installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rizonetech/overnight-runner/main/scripts/install.sh | bash
+```
+
+State lives in `.codex/` by default (no env var needed for Codex runs).
 
 ## Start Rule
 
 For explicit overnight or long autonomous todo requests, start with:
 
 ```bash
-"${OR[@]}" start path/to/todo.md
+overnight-runner start path/to/todo.md
 ```
 
 For runs with no UI or browser work, pass `--no-browser` to skip the ChromeMCP
 health probe and mark browser gates not-applicable:
 
 ```bash
-"${OR[@]}" start path/to/todo.md --no-browser
+overnight-runner start path/to/todo.md --no-browser
 ```
 
 `start` performs an adversarial todo review before normal preflight. It scans
@@ -57,7 +50,7 @@ Use the standalone form when you need to inspect or repair the todo before a
 full run:
 
 ```bash
-"${OR[@]}" todo-review path/to/todo.md --apply
+overnight-runner todo-review path/to/todo.md --apply
 ```
 
 Treat those inserted `Adversarial review:` items as real work. Implement or
@@ -137,7 +130,7 @@ would actually prove it. The pass should be fast, but it must be real:
 Record each checked claim with the guard:
 
 ```bash
-"${OR[@]}" checked-review \
+overnight-runner checked-review \
   --line 12 \
   --status passed \
   --evidence "tests/Feature/LoginTest.php covers password reset" \
@@ -149,7 +142,7 @@ the todo and implement it immediately. Record the review as `remediated` only
 after the gap is fixed and evidenced:
 
 ```bash
-"${OR[@]}" checked-review \
+overnight-runner checked-review \
   --line 12 \
   --status remediated \
   --evidence "Login form exists, authenticates, and password reset browser coverage now passes" \
@@ -199,7 +192,7 @@ For every slice:
 Example:
 
 ```bash
-"${OR[@]}" update \
+overnight-runner update \
   --slice "Settings form" \
   --gate implemented=passed \
   --gate automated_tests=passed \
@@ -294,7 +287,7 @@ Generic module:
 Before final response:
 
 ```bash
-"${OR[@]}" finish-check
+overnight-runner finish-check
 ```
 
 Use `--allow-blocked` only when every remaining unchecked item has a concrete
@@ -304,8 +297,8 @@ evidence.
 For handoff:
 
 ```bash
-"${OR[@]}" handoff --write-todo
-"${OR[@]}" clear "completed overnight run"
+overnight-runner handoff --write-todo
+overnight-runner clear "completed overnight run"
 ```
 
 The final answer should summarize completed slices, verified gates, blockers,

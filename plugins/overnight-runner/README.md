@@ -6,17 +6,25 @@ items in-place. During the run it tracks slice gates and keeps completion honest
 
 ## Quick Start
 
+Install the core CLI first (see https://github.com/rizonetech/overnight-runner):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rizonetech/overnight-runner/main/scripts/install.sh | bash
+```
+
+Then use it:
+
 ```bash
 # start a guarded run (with ChromeMCP browser probe)
-~/.codex/tools/overnight-runner start todo/example.md
+overnight-runner start todo/example.md
 
 # skip browser probe for non-UI runs
-~/.codex/tools/overnight-runner start todo/example.md --no-browser
+overnight-runner start todo/example.md --no-browser
 
 # check status, finish, and hand off
-~/.codex/tools/overnight-runner status
-~/.codex/tools/overnight-runner finish-check
-~/.codex/tools/overnight-runner handoff --write-todo
+overnight-runner status
+overnight-runner finish-check
+overnight-runner handoff --write-todo
 ```
 
 Other commands:
@@ -77,3 +85,7 @@ for per-module deploy and rollback rules.
 .codex/state/overnight-runner.json
 .codex/reports/overnight-todo-adversarial-review-*.json
 ```
+
+The guard script lives in the core repo at
+https://github.com/rizonetech/overnight-runner — this Codex plugin ships only
+the skill and config.

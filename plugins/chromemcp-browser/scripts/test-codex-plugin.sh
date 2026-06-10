@@ -44,7 +44,6 @@ for rel in [
     "plugins/chromemcp-browser/.mcp.json",
     "plugins/bashlane/.codex-plugin/plugin.json",
     "plugins/overnight-runner/.codex-plugin/plugin.json",
-    "plugins/overnight-runner/scripts/overnight-runner.py",
     "plugins/overnight-runner/skills/overnight-runner/SKILL.md",
 ]:
     path = root / rel
@@ -120,7 +119,7 @@ assert_file "$installed_plugin/.codex-plugin/icon.png"
 assert_file "$installed_plugin/.codex-plugin/icon.svg"
 assert_file "$install_root/plugins/bashlane/.codex-plugin/plugin.json"
 assert_file "$install_root/plugins/overnight-runner/.codex-plugin/plugin.json"
-assert_file "$install_root/plugins/overnight-runner/scripts/overnight-runner.py"
+
 assert_not_exists "$install_root/plugins/claude-code-adversarial-review"
 assert_file "$plugin_home/tools/overnight-runner"
 assert_file "$plugin_home/tools/chromemcp-run"
@@ -141,7 +140,7 @@ assert_not_contains "\\old\\ChromeMCP" "$config"
 
 assert_contains "http://localhost:8931/mcp" "$installed_mcp"
 assert_contains "<TOKEN>" plugins/chromemcp-browser/.mcp.json
-assert_contains "plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py" "$plugin_home/tools/overnight-runner"
+assert_contains "rizonetech/overnight-runner" "$plugin_home/tools/overnight-runner"
 assert_contains "plugins/rizonetech-local/plugins/chromemcp-browser/bin/chromemcp-run" "$plugin_home/tools/chromemcp-run"
 
 python3 - "$install_root" "$installed_mcp" <<'PY'

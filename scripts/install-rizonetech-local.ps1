@@ -176,7 +176,7 @@ $plugins = @(
   @{
     Name = "overnight-runner"
     Source = Join-Path $SourcePluginsRoot "overnight-runner"
-    Requires = @(".codex-plugin\plugin.json", "scripts\overnight-runner.py", "skills\overnight-runner\SKILL.md")
+    Requires = @(".codex-plugin\plugin.json", "skills\overnight-runner\SKILL.md")
   }
 )
 
@@ -301,14 +301,15 @@ $overnightRunnerShim = @'
 #!/usr/bin/env bash
 set -euo pipefail
 
-script="$HOME/.codex/plugins/rizonetech-local/plugins/overnight-runner/scripts/overnight-runner.py"
-if [ ! -f "$script" ]; then
-  echo "Overnight Runner helper not found: $script" >&2
-  echo "Run scripts/install-rizonetech-local.ps1 from the codex-plugins repository, then restart Codex." >&2
+if [ -x "$HOME/.local/bin/overnight-runner" ]; then
+  exec "$HOME/.local/bin/overnight-runner" "$@"
+elif command -v overnight-runner >/dev/null 2>&1; then
+  exec overnight-runner "$@"
+else
+  echo "overnight-runner CLI not found." >&2
+  echo "Install it with: curl -fsSL https://raw.githubusercontent.com/rizonetech/overnight-runner/main/scripts/install.sh | bash" >&2
   exit 127
 fi
-
-exec python3 "$script" "$@"
 '@
 $overnightRunnerShimPath = Join-Path $toolsRoot "overnight-runner"
 [System.IO.File]::WriteAllText($overnightRunnerShimPath, $overnightRunnerShim.Replace("`r`n", "`n") + "`n", $utf8NoBom)
