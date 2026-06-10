@@ -1,161 +1,67 @@
 # Rizonetech Codex Plugins
 
-Self-contained Codex marketplace for Rizonetech plugins.
-
-This repository contains the plugin payloads and installer needed to develop and install the Rizonetech Codex plugins from one place.
+Three Codex plugins for Windows/WSL2 development — ChromeMCP browser automation,
+WSL command routing, and guarded overnight todo runs.
 
 ## Plugins
 
-- [ChromeMCP](plugins/chromemcp-browser)
-- [Bashlane](plugins/bashlane)
-- [Overnight Runner](plugins/overnight-runner)
-
-## Requirements
-
-- Windows 10/11 with WSL2
-- Google Chrome on Windows for ChromeMCP
-- PowerShell 5.1 or newer
+| Plugin | Description |
+|---|---|
+| [chromemcp-browser](plugins/chromemcp-browser) | Thin client for [ChromeMCP](https://github.com/rizonetech/ChromeMCP) — drive a real, signed-in Windows Chrome from Codex over MCP |
+| [bashlane](plugins/bashlane) | Route Codex command work from PowerShell into WSL via `wsl-run` |
+| [overnight-runner](plugins/overnight-runner) | State guard for long autonomous todo runs — adversarial review, slice gates, ChromeMCP verification, finish checks |
 
 ## Install
 
-Clone the repository, then run the installer from PowerShell at the repository
-root:
+From PowerShell at the repo root:
 
 ```powershell
 git clone https://github.com/rizonetech/codex-plugins.git
 cd codex-plugins
-powershell -ExecutionPolicy Bypass -File .\scripts\install-rizonetech-local.ps1
+powershell -ExecutionPolicy Bypass -File ./scripts/install-rizonetech-local.ps1
 ```
 
-The installer creates:
+Restart Codex after installation so it picks up the local marketplace and MCP config.
+
+## What Gets Installed
 
 ```text
 ~/.codex/plugins/rizonetech-local/
-  .agents/plugins/marketplace.json
   plugins/chromemcp-browser/
   plugins/bashlane/
   plugins/overnight-runner/
 ~/.codex/tools/
   chromemcp-run
   overnight-runner
+  wsl-run.ps1
 ```
 
-It also updates `~/.codex/config.toml` to enable:
+The installer also enables all three plugins in `~/.codex/config.toml` and
+removes legacy `chromemcp-local` / `bashlane-local` marketplace folders.
 
-```toml
-[plugins."chromemcp-browser@rizonetech-local"]
-enabled = true
+## ChromeMCP
 
-[plugins."bashlane@rizonetech-local"]
-enabled = true
-
-[plugins."overnight-runner@rizonetech-local"]
-enabled = true
-```
-
-All plugins are grouped under the `Rizonetech` category.
-
-Restart Codex after installation so it reloads the local marketplace and MCP
-definitions.
-
-## ChromeMCP First Run
-
-The ChromeMCP infrastructure installs separately to `~/ChromeMCP`. After
-installing this plugin, install ChromeMCP from WSL:
+The `chromemcp-browser` plugin is the thin model-facing layer only. The
+infrastructure (Playwright MCP server, auth proxy, Windows bridge, systemd unit)
+installs separately to `~/ChromeMCP`:
 
 ```bash
 git clone https://github.com/rizonetech/ChromeMCP ~/github/ChromeMCP
 bash ~/github/ChromeMCP/scripts/install.sh --from-source
+# or the release one-liner:
+# curl -fsSL https://raw.githubusercontent.com/rizonetech/ChromeMCP/main/scripts/install.sh | bash
 chromemcp enable && chromemcp test
 ```
 
-On a clean machine, `chromemcp enable` installs the systemd service and the
-first `chromemcp up` may prompt for administrator approval to install the
-WSL-to-Windows bridge. Approve the UAC prompt. A healthy setup reports:
+See [github.com/rizonetech/ChromeMCP](https://github.com/rizonetech/ChromeMCP)
+for setup, security model, and troubleshooting.
 
-```text
-Endpoint: http://127.0.0.1:8931/healthz - OK
-CDP healthy: yes (...)
-```
+## Requirements
 
-ChromeMCP focuses the visible ChromeMCP Chrome window before browser tool calls
-by default. Set `MCP_VISIBLE_INTERACTIONS=0` only if you want background
-behavior.
+- Windows 10/11 with WSL2
+- PowerShell 5.1 or newer
+- Google Chrome on Windows (for chromemcp-browser)
 
-When a chat does not expose a direct ChromeMCP MCP tool, use the installed MCP
-safe runner rather than raw CDP:
+## License
 
-```bash
-~/.codex/tools/chromemcp-run --url "https://example.com" --required --handoff --screenshot
-```
-
-## Bashlane First Run
-
-The installer also installs the global `wsl-run` helper. New PowerShell sessions
-can run:
-
-```powershell
-wsl-run 'pwd && uname -a'
-```
-
-## Overnight Runner First Run
-
-Overnight Runner adds a reusable skill and helper for long todo-file runs. It
-stores run state in the active project at `.codex/state/overnight-runner.json`
-and probes ChromeMCP at `http://127.0.0.1:8931/healthz` before browser work.
-
-```bash
-~/.codex/tools/overnight-runner start todo/example.md
-~/.codex/tools/overnight-runner status
-```
-
-If ChromeMCP is not installed, enabled, or running, the runner records a
-ChromeMCP blocker and still allows non-browser work to continue when safe. UI,
-visual, CRUD/GRUD, and production smoke items must stay incomplete until real
-ChromeMCP evidence is captured.
-
-## Layout
-
-```text
-plugins/
-  chromemcp-browser/  # Codex plugin (model-facing layer only; infra at ~/ChromeMCP)
-  bashlane/           # Codex plugin plus wsl-run installer/helper
-  overnight-runner/   # Codex plugin plus long todo guard/helper
-scripts/
-  install-rizonetech-local.ps1
-```
-
-Develop plugin changes directly in `plugins/`, then rerun the installer to refresh the local Codex marketplace.
-
-## Clean Installs
-
-The installer derives paths from its own location and from Codex defaults:
-
-- Codex config: `$env:CODEX_HOME` or `$HOME\.codex`
-- Codex plugin cache: `$HOME\.codex`, or the matching WSL home when the repo is run from `\\wsl.localhost\...`
-
-Override either path when needed:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-rizonetech-local.ps1 `
-  -CodexConfigHome "$HOME\.codex" `
-  -CodexPluginHome "\\wsl.localhost\Ubuntu\home\you\.codex"
-```
-
-The installer also removes older `chromemcp-local` and `bashlane-local` marketplace folders unless `-KeepOldLocalMarketplaces` is provided.
-
-## Browser Smoke Tests
-
-The real browser smoke test is target-driven so this repository does not bake
-in local app names, URLs, or credentials. Copy
-`scripts/real-browser-smoke-targets.example.json` to a private location, point
-it at your own `.secrets` files, then run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\test-real-browser.ps1 `
-  -TargetsPath "\\wsl.localhost\Ubuntu\path\to\your-targets.json"
-```
-
-The test brings the ChromeMCP window forward before browser actions by default
-so the run is visible. Pass `-NoVisible` only when you intentionally want a
-background smoke run.
+MIT
