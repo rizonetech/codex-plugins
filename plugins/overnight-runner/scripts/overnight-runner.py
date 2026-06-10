@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -729,17 +730,22 @@ def module_preflight_checks(root: Path, modules: list[dict[str, Any]], classific
 
 
 def find_chromemcp_roots(root: Path) -> list[str]:
+    env_home = os.environ.get("CHROMEMCP_HOME")
     candidates = [
+        Path(env_home) if env_home else None,
+        Path.home() / "ChromeMCP",
         Path.home() / ".codex/plugins/rizonetech-local/plugins/chromemcp-browser",
         root / "plugins/chromemcp-browser",
-        root.parent / "codex-plugins/plugins/chromemcp-browser",
-        Path("/home/<user>/github/codex-plugins/plugins/chromemcp-browser"),
-        Path("/home/<user>/github/ChromeMCP"),
     ]
     found = []
     for candidate in candidates:
-        if candidate.exists() and str(candidate) not in found:
+        if candidate and candidate.exists() and str(candidate) not in found:
             found.append(str(candidate))
+    cli = shutil.which("chromemcp")
+    if cli:
+        cli_home = str(Path(cli).resolve().parent)
+        if cli_home not in found:
+            found.append(cli_home)
     return found
 
 
