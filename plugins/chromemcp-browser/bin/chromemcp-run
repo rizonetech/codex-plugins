@@ -6,6 +6,8 @@ set -euo pipefail
 
 CHROMEMCP_HOME="${CHROMEMCP_HOME:-$HOME/ChromeMCP}"
 SAFE_RUNNER="$CHROMEMCP_HOME/mcp/client/safe_runner.py"
+export MCP_URL="${MCP_URL:-http://127.0.0.1:8941/mcp}"
+export MCP_TOKEN_PATH="${MCP_TOKEN_PATH:-${XDG_CONFIG_HOME:-$HOME/.config}/chromemcp-codex/token}"
 
 if [ ! -f "$SAFE_RUNNER" ]; then
   echo "chromemcp-run: safe_runner.py not found at $SAFE_RUNNER" >&2

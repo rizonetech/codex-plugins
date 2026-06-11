@@ -2,13 +2,13 @@ interface:
   display_name: "ChromeMCP Browser"
   short_description: "Drive shared Chrome through local MCP"
   brand_color: "#1F6FEB"
-  default_prompt: "Use $chromemcp-browser to test this app in the shared ChromeMCP browser."
+  default_prompt: "Use $chromemcp-browser to test this app in the Codex-isolated ChromeMCP browser."
 dependencies:
   tools:
     - type: "mcp"
       value: "chromemcp-playwright"
-      description: "Local ChromeMCP Playwright MCP server"
+      description: "Codex-isolated ChromeMCP Playwright MCP server"
       transport: "streamable_http"
-      url: "http://localhost:8931/mcp"
+      url: "http://localhost:8941/mcp"
 policy:
   allow_implicit_invocation: true

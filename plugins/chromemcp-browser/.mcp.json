@@ -2,11 +2,11 @@
   "mcpServers": {
     "chromemcp-playwright": {
       "type": "http",
-      "url": "http://localhost:8931/mcp",
+      "url": "http://localhost:8941/mcp",
       "headers": {
         "Authorization": "Bearer <TOKEN>"
       },
-      "note": "Local ChromeMCP Playwright MCP server. Start it with 'chromemcp up'. SUBSTITUTE <TOKEN> with the output of 'chromemcp token'. Install ChromeMCP from https://github.com/rizonetech/ChromeMCP."
+      "note": "Codex-isolated ChromeMCP Playwright MCP server. Start it with 'chromemcp codex-up'. SUBSTITUTE <TOKEN> with the output of 'MCP_TOKEN_PATH=~/.config/chromemcp-codex/token chromemcp token'. Install ChromeMCP from https://github.com/rizonetech/ChromeMCP."
     }
   }
 }

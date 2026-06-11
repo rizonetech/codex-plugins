@@ -22,6 +22,11 @@ def main() -> int:
 
     env = dict(os.environ)
     env["PYTHONPATH"] = chromemcp_home
+    env.setdefault("MCP_URL", "http://127.0.0.1:8941/mcp")
+    env.setdefault(
+        "MCP_TOKEN_PATH",
+        os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "chromemcp-codex", "token"),
+    )
 
     return subprocess.call(
         [sys.executable, "-m", "mcp.client.safe_runner"] + sys.argv[1:],

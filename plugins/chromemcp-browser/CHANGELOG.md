@@ -6,6 +6,13 @@ All notable changes to ChromeMCP are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- ChromeMCP Browser now defaults Codex to the isolated ChromeMCP stack at
+  `http://localhost:8941/mcp` with token path
+  `~/.config/chromemcp-codex/token`. This keeps Codex browser work separate
+  from the default Claude/shared ChromeMCP instance on `8931/9222`.
+
 ### Verified Chrome versions
 
 - **Last verified-working Chrome**: `148.0.7778.98` (Windows stable, 2026-05-19).
