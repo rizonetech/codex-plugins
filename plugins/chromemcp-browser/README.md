@@ -50,7 +50,15 @@ When no direct MCP tool is exposed in a chat, use the installed safe runner:
 ```
 
 The wrapper defaults to `MCP_URL=http://127.0.0.1:8941/mcp` and
-`MCP_TOKEN_PATH=~/.config/chromemcp-codex/token`.
+`MCP_TOKEN_PATH=~/.config/chromemcp-codex/token`. For concurrent Codex
+overnights, claim a lane and export it before using the wrapper:
+
+```bash
+eval "$(chromemcp codex-lane acquire --format shell --owner "codex-$$")"
+chromemcp codex-up "$CODEX_CHROMEMCP_LANE"
+~/.codex/tools/chromemcp-run --url "https://example.com" --required
+chromemcp codex-lane release "$CODEX_CHROMEMCP_LANE"
+```
 
 This provides structured browser evidence without raw CDP. Raw CDP/WebSocket
 checks are diagnostic only and do not satisfy `browser_verification=passed`.

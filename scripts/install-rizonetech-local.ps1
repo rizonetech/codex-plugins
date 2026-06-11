@@ -325,8 +325,12 @@ if [ ! -f "$script" ]; then
   exit 127
 fi
 
-export MCP_URL="${MCP_URL:-http://127.0.0.1:8941/mcp}"
-export MCP_TOKEN_PATH="${MCP_TOKEN_PATH:-${XDG_CONFIG_HOME:-$HOME/.config}/chromemcp-codex/token}"
+if [ -n "${CODEX_CHROMEMCP_LANE:-}" ] && command -v chromemcp >/dev/null 2>&1; then
+  eval "$(chromemcp codex-lane env "$CODEX_CHROMEMCP_LANE" --format shell)"
+else
+  export MCP_URL="${MCP_URL:-http://127.0.0.1:8941/mcp}"
+  export MCP_TOKEN_PATH="${MCP_TOKEN_PATH:-${XDG_CONFIG_HOME:-$HOME/.config}/chromemcp-codex/token}"
+fi
 
 exec bash "$script" "$@"
 '@

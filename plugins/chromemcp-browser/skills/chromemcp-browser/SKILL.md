@@ -12,10 +12,11 @@ https://github.com/rizonetech/ChromeMCP via:
 
 ```bash
 bash ~/github/ChromeMCP/scripts/install.sh --from-source
-chromemcp codex-bridge
-chromemcp codex-chrome
-chromemcp codex-up
-MCP_URL=http://127.0.0.1:8941/mcp MCP_TOKEN_PATH=~/.config/chromemcp-codex/token chromemcp test
+eval "$(chromemcp codex-lane acquire --format shell --owner "codex-$$")"
+chromemcp codex-bridge "$CODEX_CHROMEMCP_LANE"
+chromemcp codex-chrome "$CODEX_CHROMEMCP_LANE"
+chromemcp codex-up "$CODEX_CHROMEMCP_LANE"
+MCP_URL="$MCP_URL" MCP_TOKEN_PATH="$MCP_TOKEN_PATH" chromemcp test
 ```
 
 The `chromemcp` CLI is at `~/.local/bin/chromemcp`. Screenshots are returned inline
@@ -28,26 +29,28 @@ timestamped filename.
 1. Ensure the external server is running:
 
 ```bash
-chromemcp codex-up
+eval "$(chromemcp codex-lane acquire --format shell --owner "codex-$$")"
+chromemcp codex-up "$CODEX_CHROMEMCP_LANE"
 ```
 
 2. Verify the bridge before relying on it:
 
 ```bash
-MCP_URL=http://127.0.0.1:8941/mcp MCP_TOKEN_PATH=~/.config/chromemcp-codex/token chromemcp test
+MCP_URL="$MCP_URL" MCP_TOKEN_PATH="$MCP_TOKEN_PATH" chromemcp test
 ```
 
 3. Use the exposed MCP server named `chromemcp-playwright` for browser actions.
 
 If the Codex smoke test fails because CDP is unreachable, run
-`chromemcp codex-bridge /refresh`, then retry `chromemcp codex-up`. Fix
+`chromemcp codex-bridge "$CODEX_CHROMEMCP_LANE" /refresh`, then retry
+`chromemcp codex-up "$CODEX_CHROMEMCP_LANE"`. Fix
 ChromeMCP before claiming browser verification passed.
 
 ## Tab Discipline
 
 - List tabs before acting; reuse the current tab for navigation.
 - Never retry a failed navigation by opening a new tab — recover health instead
-  (`chromemcp codex-bridge /refresh`).
+  (`chromemcp codex-bridge "$CODEX_CHROMEMCP_LANE" /refresh`).
 - Hard cap: 3 tabs open at once. Never close tabs you did not open this session
   without asking the user first.
 - Close every tab you opened before finishing the task.
@@ -84,7 +87,8 @@ For destructive actions, click the visible action first, scope confirmation to t
 
 ## Client Notes
 
-- The Codex endpoint is `http://localhost:8941/mcp`.
+- Lane 1's Codex endpoint is `http://localhost:8941/mcp`; lane 2 uses `http://localhost:8951/mcp`, and higher lanes follow the same `+10` pattern.
+- For concurrent Codex runs, claim a lane with `eval "$(chromemcp codex-lane acquire --format shell --owner "codex-$$")"` and release it with `chromemcp codex-lane release "$CODEX_CHROMEMCP_LANE"` when done.
 - The Codex Chrome profile lives at `%LOCALAPPDATA%\ChromeMCP-Codex\Profile` on Windows.
 - The default Claude/shared ChromeMCP endpoint remains `http://localhost:8931/mcp`; do not use it from Codex when the user wants isolation.
 - If Codex has not loaded this plugin yet, run the Rizonetech marketplace installer from the `codex-plugins` repository and restart Codex after enabling `chromemcp-browser@rizonetech-local`.

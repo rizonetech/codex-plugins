@@ -143,6 +143,9 @@ assert_contains "<TOKEN>" plugins/chromemcp-browser/.mcp.json
 assert_contains "rizonetech/overnight-runner" "$plugin_home/tools/overnight-runner"
 assert_contains "plugins/rizonetech-local/plugins/chromemcp-browser/bin/chromemcp-run" "$plugin_home/tools/chromemcp-run"
 assert_contains "http://127.0.0.1:8941/mcp" "$plugin_home/tools/chromemcp-run"
+assert_contains "CODEX_CHROMEMCP_LANE" "$plugin_home/tools/chromemcp-run"
+assert_contains "codex-lane env" "$plugin_home/tools/chromemcp-run"
+assert_contains "CODEX_CHROMEMCP_LANE" "$installed_plugin/bin/chromemcp-run"
 
 python3 - "$install_root" "$installed_mcp" <<'PY'
 import json

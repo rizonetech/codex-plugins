@@ -12,6 +12,9 @@ All notable changes to ChromeMCP are recorded here. Format loosely follows
   `http://localhost:8941/mcp` with token path
   `~/.config/chromemcp-codex/token`. This keeps Codex browser work separate
   from the default Claude/shared ChromeMCP instance on `8931/9222`.
+- `chromemcp-run` now honors `CODEX_CHROMEMCP_LANE`, allowing concurrent Codex
+  overnight runs to target different ChromeMCP lanes without sharing tabs,
+  profiles, ports, or token files.
 
 ### Verified Chrome versions
 
