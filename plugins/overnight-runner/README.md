@@ -6,10 +6,11 @@ items in-place. During the run it tracks slice gates and keeps completion honest
 
 ## Quick Start
 
-Install the core CLI first (see https://github.com/rizonetech/overnight-runner):
+The engine ships inside this plugin. Install it into the Codex runtime
+(`~/.codex/tools/overnight-runner` wrapper + `~/.codex/overnight-runner/` engine):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rizonetech/overnight-runner/main/scripts/install.sh | bash
+bash scripts/install-codex-plugin.sh
 ```
 
 Then use it:
@@ -86,6 +87,5 @@ for per-module deploy and rollback rules.
 .codex/reports/overnight-todo-adversarial-review-*.json
 ```
 
-The guard script lives in the core repo at
-https://github.com/rizonetech/overnight-runner — this Codex plugin ships only
-the skill and config.
+The guard engine ships with this plugin at `.codex/scripts/overnight-runner.py`
+and installs to `~/.codex/overnight-runner/` via `scripts/install-codex-plugin.sh`.

@@ -12,17 +12,19 @@ execution, or a final finish check for such a run.
 
 ## Helper Path
 
-The `overnight-runner` CLI must be installed from
-https://github.com/rizonetech/overnight-runner. Verify it is available:
+The `overnight-runner` engine ships inside this plugin and installs into the
+Codex runtime at `~/.codex/tools/overnight-runner` (wrapper) and
+`~/.codex/overnight-runner/` (engine). Verify it is available:
 
 ```bash
-command -v overnight-runner >/dev/null 2>&1
+command -v overnight-runner >/dev/null 2>&1 || [ -x "$HOME/.codex/tools/overnight-runner" ]
 ```
 
-If it is missing, do NOT improvise — tell the user and offer the installer:
+If it is missing, do NOT improvise — tell the user and offer the installer that
+ships with this plugin:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rizonetech/overnight-runner/main/scripts/install.sh | bash
+bash <codex-plugins>/plugins/overnight-runner/scripts/install-codex-plugin.sh
 ```
 
 State lives in `.codex/` by default (no env var needed for Codex runs).

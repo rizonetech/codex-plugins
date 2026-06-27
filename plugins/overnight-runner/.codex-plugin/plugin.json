@@ -1,6 +1,6 @@
 {
   "name": "overnight-runner",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Run long autonomous todo files with adversarial todo review, side-change preservation, guarded slice gates, and visible ChromeMCP verification.",
   "author": {
     "name": "Rizonetech (Pty) Ltd",

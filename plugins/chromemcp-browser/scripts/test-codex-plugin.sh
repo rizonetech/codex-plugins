@@ -66,7 +66,7 @@ assert plugins["overnight-runner"]["source"]["path"] == "./plugins/overnight-run
 mcp = json.loads((root / "plugins/chromemcp-browser/.mcp.json").read_text())
 server = mcp["mcpServers"]["chromemcp-playwright"]
 assert server["type"] == "http"
-assert server["url"] == "http://localhost:8931/mcp"
+assert server["url"] == "http://localhost:8941/mcp"
 assert server["headers"]["Authorization"] == "Bearer <TOKEN>"
 PY
 
@@ -138,10 +138,14 @@ assert_contains "model = \"gpt-5.5\"" "$config"
 assert_not_contains "chromemcp-local" "$config"
 assert_not_contains "\\old\\ChromeMCP" "$config"
 
-assert_contains "http://localhost:8931/mcp" "$installed_mcp"
+assert_contains "http://localhost:8941/mcp" "$installed_mcp"
 assert_contains "<TOKEN>" plugins/chromemcp-browser/.mcp.json
 assert_contains "rizonetech/overnight-runner" "$plugin_home/tools/overnight-runner"
 assert_contains "plugins/rizonetech-local/plugins/chromemcp-browser/bin/chromemcp-run" "$plugin_home/tools/chromemcp-run"
+assert_contains "http://127.0.0.1:8941/mcp" "$plugin_home/tools/chromemcp-run"
+assert_contains "CODEX_CHROMEMCP_LANE" "$plugin_home/tools/chromemcp-run"
+assert_contains "codex-lane env" "$plugin_home/tools/chromemcp-run"
+assert_contains "CODEX_CHROMEMCP_LANE" "$installed_plugin/bin/chromemcp-run"
 
 python3 - "$install_root" "$installed_mcp" <<'PY'
 import json
@@ -159,6 +163,7 @@ overnight = json.loads((install_root / "plugins/overnight-runner/.codex-plugin/p
 assert overnight["interface"]["category"] == "Rizonetech"
 server = json.loads(installed_mcp.read_text())["mcpServers"]["chromemcp-playwright"]
 assert server["headers"]["Authorization"].startswith("Bearer ")
+assert server["url"] == "http://localhost:8941/mcp"
 PY
 
 echo "PASS codex plugin metadata and monorepo installer"

@@ -19,19 +19,23 @@ git clone https://github.com/rizonetech/ChromeMCP ~/github/ChromeMCP
 bash ~/github/ChromeMCP/scripts/install.sh --from-source
 ```
 
-Then enable and verify:
+Then start and verify the Codex-isolated stack:
 
 ```bash
-chromemcp enable && chromemcp test
+chromemcp codex-bridge
+chromemcp codex-chrome
+chromemcp codex-up
+MCP_URL=http://127.0.0.1:8941/mcp MCP_TOKEN_PATH=~/.config/chromemcp-codex/token chromemcp test
 ```
 
-A healthy setup reports `Endpoint: http://127.0.0.1:8931/healthz - OK` and
-`CDP healthy: yes`.
+A healthy setup reports `Endpoint: http://127.0.0.1:8941/healthz - OK` and
+`CDP healthy: yes`, while the default Claude/shared ChromeMCP instance remains
+on `8931/9222`.
 
 ## What the Skill Does
 
-The `chromemcp-browser` skill instructs Codex to use the shared ChromeMCP
-Playwright MCP endpoint (`http://localhost:8931/mcp`) for authenticated browser
+The `chromemcp-browser` skill instructs Codex to use the Codex-isolated
+ChromeMCP Playwright MCP endpoint (`http://localhost:8941/mcp`) for authenticated browser
 verification, CRUD testing, local web app testing, production smoke checks, and
 screenshots. It enforces tab discipline, stable locators, CRUD loop coverage,
 and visual QA rules. See [SKILL.md](skills/chromemcp-browser/SKILL.md) for the
@@ -43,6 +47,17 @@ When no direct MCP tool is exposed in a chat, use the installed safe runner:
 
 ```bash
 ~/.codex/tools/chromemcp-run --url "https://example.com" --required --handoff --screenshot
+```
+
+The wrapper defaults to `MCP_URL=http://127.0.0.1:8941/mcp` and
+`MCP_TOKEN_PATH=~/.config/chromemcp-codex/token`. For concurrent Codex
+overnights, claim a lane and export it before using the wrapper:
+
+```bash
+eval "$(chromemcp codex-lane acquire --format shell --owner "codex-$$")"
+chromemcp codex-up "$CODEX_CHROMEMCP_LANE"
+~/.codex/tools/chromemcp-run --url "https://example.com" --required
+chromemcp codex-lane release "$CODEX_CHROMEMCP_LANE"
 ```
 
 This provides structured browser evidence without raw CDP. Raw CDP/WebSocket

@@ -7,6 +7,13 @@ set -euo pipefail
 CHROMEMCP_HOME="${CHROMEMCP_HOME:-$HOME/ChromeMCP}"
 SAFE_RUNNER="$CHROMEMCP_HOME/mcp/client/safe_runner.py"
 
+if [ -n "${CODEX_CHROMEMCP_LANE:-}" ] && command -v chromemcp >/dev/null 2>&1; then
+  eval "$(chromemcp codex-lane env "$CODEX_CHROMEMCP_LANE" --format shell)"
+else
+  export MCP_URL="${MCP_URL:-http://127.0.0.1:8941/mcp}"
+  export MCP_TOKEN_PATH="${MCP_TOKEN_PATH:-${XDG_CONFIG_HOME:-$HOME/.config}/chromemcp-codex/token}"
+fi
+
 if [ ! -f "$SAFE_RUNNER" ]; then
   echo "chromemcp-run: safe_runner.py not found at $SAFE_RUNNER" >&2
   echo "Install ChromeMCP:" >&2

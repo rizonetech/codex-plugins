@@ -1,7 +1,7 @@
 {
   "name": "chromemcp-browser",
   "version": "0.1.0",
-  "description": "Control the shared Windows ChromeMCP browser through the local Playwright MCP endpoint.",
+  "description": "Control an isolated Windows ChromeMCP browser through the local Playwright MCP endpoint.",
   "author": {
     "name": "Rizonetech (Pty) Ltd",
     "email": "derick@rizonetech.com",
@@ -21,8 +21,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "ChromeMCP Browser",
-    "shortDescription": "Drive a shared signed-in Windows Chrome from Codex",
-    "longDescription": "ChromeMCP Browser exposes the local ChromeMCP Playwright MCP server to Codex, giving agents a callable browser tool backed by a persistent Windows Chrome profile over CDP.",
+    "shortDescription": "Drive isolated signed-in Windows Chrome from Codex",
+    "longDescription": "ChromeMCP Browser exposes the Codex-isolated ChromeMCP Playwright MCP server to Codex, giving agents a callable browser tool backed by a persistent Windows Chrome profile over CDP without interfering with Claude's ChromeMCP instance.",
     "developerName": "Rizonetech",
     "category": "Engineering",
     "capabilities": [

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# overnight-runner — Codex wrapper that delegates to the installed engine.
+# Installed to ~/.codex/tools/overnight-runner by scripts/install-codex-plugin.sh.
+# The engine ships inside this plugin (.codex/scripts/overnight-runner.py) and
+# installs to ~/.codex/overnight-runner/.
+set -euo pipefail
+
+RUNNER="${OVERNIGHT_RUNNER_HOME:-$HOME/.codex/overnight-runner}/overnight-runner.py"
+
+if [ -x "$RUNNER" ]; then
+  exec "$RUNNER" "$@"
+fi
+
+echo "overnight-runner: engine not found at $RUNNER" >&2
+echo "Install it from the codex-plugins plugin:" >&2
+echo "  bash <codex-plugins>/plugins/overnight-runner/scripts/install-codex-plugin.sh" >&2
+exit 127
